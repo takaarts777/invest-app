@@ -1,0 +1,66 @@
+// Prisma schema for the investment analytics app.
+//
+// NOTE: Using SQLite for local development to get a working app running
+// without requiring a cloud database up front. Before deploying to Vercel,
+// switch the datasource below to `provider = "postgresql"` and point
+// DATABASE_URL at a hosted Postgres instance (e.g. Neon, Vercel Postgres),
+// then run `npx prisma migrate dev` again. See README.md for the exact steps.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum AssetType {
+  US_STOCK
+  LEVERAGED_ETF
+  CRYPTO
+}
+
+// A ticker the user is watching.
+model WatchlistItem {
+  id          String   @id @default(cuid())
+  // Symbol as entered/displayed to the user, e.g. "AAPL", "TQQQ", "BTC".
+  symbol      String
+  assetType   AssetType
+  displayName String?
+  // Provider-specific lookup key:
+  // - US_STOCK / LEVERAGED_ETF: the Stooq symbol, e.g. "aapl.us"
+  // - CRYPTO: the CoinGecko coin id, e.g. "bitcoin" (resolved at add time)
+  providerId  String
+  addedAt     DateTime @default(now())
+
+  snapshots AnalysisSnapshot[]
+
+  @@unique([symbol, assetType])
+}
+
+// A computed analysis result for a watchlist item, cached so the dashboard
+// and detail page don't need to recompute/refetch on every view.
+model AnalysisSnapshot {
+  id              String   @id @default(cuid())
+  watchlistItemId String
+  watchlistItem   WatchlistItem @relation(fields: [watchlistItemId], references: [id], onDelete: Cascade)
+
+  computedAt DateTime @default(now())
+
+  technicalScore   Float?
+  fundamentalScore Float?
+  sentimentScore   Float?
+  anomalyScore     Float?
+  compositeScore   Float?
+  compositeLabel   String?
+
+  // LLM-generated rationale grounded in the scores/metrics above.
+  rationale String?
+
+  // Raw per-axis metrics (indicator values, fundamentals, news items,
+  // anomaly flags) kept as JSON for display and for grounding the LLM.
+  rawDetails String?
+
+  @@index([watchlistItemId, computedAt])
+}
