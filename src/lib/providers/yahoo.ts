@@ -75,3 +75,58 @@ export async function fetchChart(
     bars,
   };
 }
+
+export type NewsItem = {
+  title: string;
+  publisher: string;
+  link: string;
+  publishedAt: string; // ISO
+};
+
+const SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search";
+
+/**
+ * Recent news headlines via Yahoo's search endpoint. Free, no API key.
+ * For crypto, pass the coin's display name (e.g. "Bitcoin") rather than
+ * its ticker — searching by ticker (e.g. "BTC-USD") returns mostly
+ * unrelated results.
+ */
+export async function searchNews(
+  query: string,
+  count = 8
+): Promise<NewsItem[]> {
+  const url = `${SEARCH_URL}?q=${encodeURIComponent(
+    query
+  )}&newsCount=${count}&quotesCount=0`;
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Yahoo Finance news search error (${res.status}) for ${query}`);
+  }
+
+  const data = await res.json();
+  const news: unknown[] = data?.news ?? [];
+
+  return news.map((n) => {
+    const item = n as {
+      title?: string;
+      publisher?: string;
+      link?: string;
+      providerPublishTime?: number;
+    };
+    return {
+      title: item.title ?? "",
+      publisher: item.publisher ?? "",
+      link: item.link ?? "",
+      publishedAt: item.providerPublishTime
+        ? new Date(item.providerPublishTime * 1000).toISOString()
+        : "",
+    };
+  });
+}

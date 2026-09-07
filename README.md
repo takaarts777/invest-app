@@ -1,7 +1,8 @@
 # 投資アナリティクス Web アプリ
 
 米国株・暗号資産・レバレッジETFのウォッチリストを管理し、テクニカル／ファンダメンタル／
-ニュースセンチメント／アノマリーの4軸で分析、買い時・売り時の目安を表示する個人用アプリ。
+ニュースセンチメント／アノマリーの4軸で分析、それらを重み付け合成した買い時・売り時の
+目安（強い買い〜強い売り）とAIによる根拠説明を表示する個人用アプリ。
 
 技術構成やディレクトリ構成、実装フェーズの進捗は [CLAUDE.md](./CLAUDE.md) を参照してください。
 
@@ -19,10 +20,14 @@ cp .env.example .env
 | --- | --- | --- |
 | `APP_PASSWORD` | ログインパスワード | 任意の文字列に変更 |
 | `SESSION_SECRET` | セッションCookie署名用の秘密鍵 | `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` |
-| `FINNHUB_API_KEY` | 今後のファンダメンタルズ/ニュース取得用（フェーズ4以降で使用、現状は未使用のため空でOK） | https://finnhub.io/register で無料登録 |
-| `ANTHROPIC_API_KEY` | センチメント判定・シグナル根拠説明の生成用（フェーズ5以降で使用） | https://console.anthropic.com/ |
+| `FINNHUB_API_KEY` | 米国株/ETFのファンダメンタルズ分析（PER/ROE等）用 | https://finnhub.io/register で無料登録 |
+| `ANTHROPIC_API_KEY` | ニュースセンチメント判定・買い時/売り時の根拠説明生成用 | https://console.anthropic.com/ |
+| `CRON_SECRET` | Vercel Cronからの定期再分析リクエストを認証する秘密鍵 | 任意の文字列（ローカルではそのままでOK） |
 
-※ 米国株/ETF・暗号資産どちらも、現時点ではAPIキー不要の無料エンドポイント（Yahoo Finance非公式API、CoinGecko）だけで動きます。
+※ ウォッチリストへの銘柄追加・価格チャート表示・暗号資産のファンダメンタルズ分析は
+`FINNHUB_API_KEY`/`ANTHROPIC_API_KEY`なしでも動きます（Yahoo Finance非公式APIとCoinGeckoは
+キー不要）。この2つのキーが未設定の場合、対応する分析パネルには「未設定」の案内が表示され、
+総合判定は残りの軸だけで算出されます（アプリは壊れません）。
 
 ### 2. インストール & DB初期化
 
@@ -55,7 +60,13 @@ http://localhost:3000 を開き、`.env` の `APP_PASSWORD` でログインし�
 3. Vercelの環境変数に `.env` と同じキー（`DATABASE_URL`, `APP_PASSWORD`, `SESSION_SECRET`, `FINNHUB_API_KEY`, `ANTHROPIC_API_KEY`, `CRON_SECRET`）を設定
 4. デプロイ後に発行されるURLへスマホ・PCどちらからでもアクセス可能
 
-（定期更新用のVercel Cron設定はフェーズ7で追加予定です）
+### 定期更新（Vercel Cron）
+
+`vercel.json` に `/api/cron/refresh` を毎日13:00 UTC（日本時間22:00、米国市場引け後）に
+叩く設定を入れてあります。Vercelがこのリクエストに自動で `Authorization: Bearer
+$CRON_SECRET` ヘッダーを付与するので、`CRON_SECRET` 環境変数を設定しておけば追加設定なしで
+動作します。頻度を変えたい場合は `vercel.json` の `schedule`（cron式）を編集してください
+（Hobbyプランはcronの実行頻度に制限があるため、頻繁に変えたい場合はProプランが必要です）。
 
 ## 開発メモ
 

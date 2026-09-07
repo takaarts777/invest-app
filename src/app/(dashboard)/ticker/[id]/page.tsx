@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getWatchlistItem } from "@/lib/market";
+import { getLatestSnapshot } from "@/lib/snapshots";
 import { PriceChart } from "@/components/PriceChart";
+import { AnalysisPanels } from "@/components/AnalysisPanels";
 
 const ASSET_TYPE_LABEL: Record<string, string> = {
   US_STOCK: "米国株",
@@ -13,6 +15,7 @@ export default async function TickerPage(props: PageProps<"/ticker/[id]">) {
   const { id } = await props.params;
   const item = await getWatchlistItem(id);
   if (!item) notFound();
+  const snapshot = await getLatestSnapshot(item.id);
 
   return (
     <div className="space-y-6">
@@ -35,9 +38,7 @@ export default async function TickerPage(props: PageProps<"/ticker/[id]">) {
 
       <PriceChart watchlistItemId={item.id} />
 
-      <div className="rounded-xl border border-dashed border-slate-800 p-6 text-center text-sm text-slate-500">
-        テクニカル・ファンダメンタル・センチメント・アノマリー分析と、買い時/売り時シグナルは近日追加予定です。
-      </div>
+      <AnalysisPanels watchlistItemId={item.id} initialSnapshot={snapshot} />
     </div>
   );
 }

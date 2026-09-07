@@ -47,6 +47,54 @@ export async function fetchCoinPrice(id: string) {
   return data[id] ?? null;
 }
 
+export type CoinDetail = {
+  marketCapRank: number | null;
+  marketCapUsd: number | null;
+  fullyDilutedValuationUsd: number | null;
+  totalVolumeUsd: number | null;
+  circulatingSupply: number | null;
+  maxSupply: number | null;
+  athUsd: number | null;
+  athChangePercent: number | null;
+  priceChangePercent30d: number | null;
+  priceChangePercent1y: number | null;
+};
+
+export async function fetchCoinDetail(id: string): Promise<CoinDetail> {
+  const data = await coingeckoFetch<{
+    market_cap_rank?: number;
+    market_data?: {
+      market_cap?: Record<string, number>;
+      fully_diluted_valuation?: Record<string, number>;
+      total_volume?: Record<string, number>;
+      circulating_supply?: number;
+      max_supply?: number | null;
+      ath?: Record<string, number>;
+      ath_change_percentage?: Record<string, number>;
+      price_change_percentage_30d?: number;
+      price_change_percentage_1y?: number;
+    };
+  }>(
+    `/coins/${encodeURIComponent(
+      id
+    )}?localization=false&tickers=false&community_data=false&developer_data=false`
+  );
+
+  const md = data.market_data ?? {};
+  return {
+    marketCapRank: data.market_cap_rank ?? null,
+    marketCapUsd: md.market_cap?.usd ?? null,
+    fullyDilutedValuationUsd: md.fully_diluted_valuation?.usd ?? null,
+    totalVolumeUsd: md.total_volume?.usd ?? null,
+    circulatingSupply: md.circulating_supply ?? null,
+    maxSupply: md.max_supply ?? null,
+    athUsd: md.ath?.usd ?? null,
+    athChangePercent: md.ath_change_percentage?.usd ?? null,
+    priceChangePercent30d: md.price_change_percentage_30d ?? null,
+    priceChangePercent1y: md.price_change_percentage_1y ?? null,
+  };
+}
+
 export async function fetchDailyHistory(
   id: string,
   days = 365

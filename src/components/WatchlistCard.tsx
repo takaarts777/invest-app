@@ -11,7 +11,23 @@ const ASSET_TYPE_LABEL: Record<WatchlistItem["assetType"], string> = {
   CRYPTO: "暗号資産",
 };
 
-export function WatchlistCard({ item }: { item: WatchlistItem }) {
+const LABEL_BADGE_COLOR: Record<string, string> = {
+  強い買い: "bg-emerald-500/15 text-emerald-400",
+  買い: "bg-emerald-500/10 text-emerald-300",
+  中立: "bg-slate-700/50 text-slate-300",
+  売り: "bg-red-500/10 text-red-300",
+  強い売り: "bg-red-500/15 text-red-400",
+};
+
+type SnapshotSummary = { compositeLabel: string | null; compositeScore: number | null };
+
+export function WatchlistCard({
+  item,
+  snapshot,
+}: {
+  item: WatchlistItem;
+  snapshot?: SnapshotSummary | null;
+}) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
@@ -46,14 +62,26 @@ export function WatchlistCard({ item }: { item: WatchlistItem }) {
         )}
       </div>
 
-      <button
-        onClick={handleDelete}
-        disabled={pending}
-        aria-label={`${item.symbol}を削除`}
-        className="rounded-md p-2 text-slate-500 transition hover:bg-slate-800 hover:text-red-400 disabled:opacity-50"
-      >
-        ✕
-      </button>
+      <div className="flex items-center gap-2">
+        {snapshot?.compositeLabel && (
+          <span
+            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+              LABEL_BADGE_COLOR[snapshot.compositeLabel] ?? "bg-slate-800 text-slate-300"
+            }`}
+          >
+            {snapshot.compositeLabel}
+          </span>
+        )}
+
+        <button
+          onClick={handleDelete}
+          disabled={pending}
+          aria-label={`${item.symbol}を削除`}
+          className="rounded-md p-2 text-slate-500 transition hover:bg-slate-800 hover:text-red-400 disabled:opacity-50"
+        >
+          ✕
+        </button>
+      </div>
     </Link>
   );
 }

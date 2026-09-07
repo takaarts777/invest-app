@@ -59,3 +59,47 @@ export type FinnhubProfile = {
 export async function fetchProfile(symbol: string): Promise<FinnhubProfile> {
   return finnhubFetch<FinnhubProfile>("/stock/profile2", { symbol });
 }
+
+// "Basic financials" (metric=all) is available on Finnhub's free tier and
+// returns a large bag of ratios; we only pick out what we use.
+export type FinnhubBasicFinancials = {
+  metric: {
+    peBasicExclExtraTTM?: number;
+    peInclExtraTTM?: number;
+    pbAnnual?: number;
+    pbQuarterly?: number;
+    roeTTM?: number;
+    roeRfy?: number;
+    netProfitMarginTTM?: number;
+    revenueGrowthTTM?: number;
+    epsGrowthTTM?: number;
+    dividendYieldIndicatedAnnual?: number;
+    "52WeekHigh"?: number;
+    "52WeekLow"?: number;
+    beta?: number;
+  };
+};
+
+export async function fetchBasicFinancials(
+  symbol: string
+): Promise<FinnhubBasicFinancials> {
+  return finnhubFetch<FinnhubBasicFinancials>("/stock/metric", {
+    symbol,
+    metric: "all",
+  });
+}
+
+export type FinnhubNewsItem = {
+  headline: string;
+  source: string;
+  url: string;
+  datetime: number; // unix seconds
+};
+
+export async function fetchCompanyNews(
+  symbol: string,
+  from: string,
+  to: string
+): Promise<FinnhubNewsItem[]> {
+  return finnhubFetch<FinnhubNewsItem[]>("/company-news", { symbol, from, to });
+}

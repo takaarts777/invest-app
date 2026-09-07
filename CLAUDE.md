@@ -16,7 +16,11 @@
 - SQLite（ローカル開発用。本番/Vercelデプロイ時は `prisma/schema.prisma` の datasource を `postgresql` に切り替え、Neon等のURLを`DATABASE_URL`に設定する）
 - lightweight-charts v5（価格チャート。`chart.addSeries(CandlestickSeries, options)` のv5 API）
 - jose（セッションCookieのJWT署名/検証）
-- 外部データ: Yahoo Finance非公式チャートAPI（米国株/ETFの現在値・日足ヒストリカル・銘柄名、無料・キー不要。`query1.finance.yahoo.com/v8/finance/chart/`。Stooqは現在ボット判定JSチャレンジを返すため不採用）、CoinGecko（暗号資産の価格・ヒストリカル、無料・キー不要）、Finnhub（今後のファンダメンタルズ/ニュース取得用に導入予定、現状未使用）
+- 外部データ:
+  - Yahoo Finance非公式API（無料・キー不要）: `/v8/finance/chart/` で米国株/ETFの現在値・日足ヒストリカル・銘柄名、`/v1/finance/search` でニュース見出し（株/ETF/暗号資産共通。暗号資産はティッカーでなく`displayName`で検索する方が精度が良い）。`/v10/finance/quoteSummary`は401で使用不可（crumb認証が必要になったため不採用）。Stooqはボット判定JSチャレンジを返すため不採用。
+  - CoinGecko（無料・キー不要）: 暗号資産の価格・日足ヒストリカル（`/coins/{id}/ohlc`）・ファンダメンタルズ相当データ（`/coins/{id}` — 時価総額ランク・ATHからの乖離・供給量等）
+  - Finnhub（`FINNHUB_API_KEY`必須）: 株/ETFのファンダメンタルズ（`/stock/metric?metric=all` — PER/PBR/ROE/売上成長率等）。企業ニュース取得用の`fetchCompanyNews`も実装済みだが現状はYahoo検索で代替しており未使用。
+  - Anthropic Claude（`ANTHROPIC_API_KEY`必須、`claude-sonnet-5`）: ニュース見出しからのセンチメントスコア算出、4軸分析結果を根拠にした買い時/売り時の説明文生成。どちらもキー未設定時は例外を投げず「未設定」を示すエラー/メッセージにフォールバックする。
 - Anthropic SDK（Claude — センチメント判定・シグナル根拠説明。フェーズ5以降で使用）
 
 ## Next.js 16 の注意点（従来バージョンと異なる点）
@@ -39,19 +43,28 @@ src/
   app/
     login/            # ログインページ + Server Action
     (dashboard)/       # 認証必須エリア（共通ヘッダー付きレイアウト）
-      page.tsx          # ダッシュボード（ウォッチリスト）
-      ticker/[id]/       # 銘柄詳細（チャート + 分析パネル）
+      page.tsx          # ダッシュボード（ウォッチリスト + 総合シグナルバッジ）
+      ticker/[id]/       # 銘柄詳細（チャート + 4軸分析パネル + 総合シグナル）
     api/
       watchlist/         # 銘柄の一覧取得・追加・削除
       prices/[id]/        # 価格ヒストリー + 現在値
+      analyze/[id]/        # 4軸分析パイプラインを実行しAnalysisSnapshotを保存
+      cron/refresh/         # Vercel Cronからの定期一括再分析（CRON_SECRET必須）
   lib/
     db.ts               # Prisma Client シングルトン
     session.ts           # セッション作成/検証（jose）
     actions.ts            # 共通Server Actions（ログアウト等）
     market.ts              # ウォッチリストCRUD + 価格取得の統合ロジック
-    providers/               # 外部API個別クライアント（finnhub/stooq/coingecko）
-    analysis/                 # テクニカル/ファンダメンタル/センチメント/アノマリー/シグナル統合（フェーズ4以降）
-  components/            # UIコンポーネント
+    snapshots.ts             # AnalysisSnapshotの取得ヘルパー
+    providers/               # 外部API個別クライアント（yahoo/coingecko/finnhub）
+    analysis/                 # 分析ロジック本体
+      technical.ts             # テクニカル指標（SMA/EMA/RSI/MACD/BB）→ -1..1スコア
+      fundamental.ts            # PER/ROE等（株/ETF）、時価総額ランク等（暗号資産）→ スコア
+      sentiment.ts               # ニュース見出し取得 + Claudeでセンチメントスコア化
+      anomaly.ts                  # 出来高/価格急変・カレンダー効果・レバレッジ減価リスク・
+                                    # 移動平均乖離・RSI底値の過去傾向比較 → スコア + findings
+      signal.ts                    # 4軸を重み付け合成 + Claudeで根拠説明文を生成
+  components/            # UIコンポーネント（AnalysisPanelsが分析結果の表示を担当）
 prisma/
   schema.prisma          # WatchlistItem, AnalysisSnapshot
 ```
@@ -68,7 +81,11 @@ prisma/
 - [x] フェーズ1: プロジェクト初期化
 - [x] フェーズ2: 認証・共通レイアウト
 - [x] フェーズ3: ウォッチリストCRUD + 価格チャート
-- [ ] フェーズ4: テクニカル・ファンダメンタル分析
-- [ ] フェーズ5: センチメント・アノマリー分析
-- [ ] フェーズ6: シグナル統合（買い時/売り時 + LLM根拠説明）
-- [ ] フェーズ7: 定期更新（Vercel Cron）・デプロイ
+- [x] フェーズ4: テクニカル・ファンダメンタル分析
+- [x] フェーズ5: センチメント・アノマリー分析
+- [x] フェーズ6: シグナル統合（買い時/売り時 + LLM根拠説明）
+- [x] フェーズ7: 定期更新（Vercel Cron設定済み、`vercel.json`）・デプロイ手順（README）
+
+全フェーズの土台は完成。残っているのはユーザー側の作業（Finnhub/AnthropicのAPIキー取得、
+Postgresへの切り替え、Vercelへの実デプロイ）と、実運用しながらのスコアリング重み・
+閾値のチューニング。

@@ -1,9 +1,11 @@
 import { listWatchlist } from "@/lib/market";
+import { getLatestSnapshotsFor } from "@/lib/snapshots";
 import { AddTickerForm } from "@/components/AddTickerForm";
 import { WatchlistCard } from "@/components/WatchlistCard";
 
 export default async function DashboardPage() {
   const items = await listWatchlist();
+  const snapshots = await getLatestSnapshotsFor(items.map((i) => i.id));
 
   return (
     <div className="space-y-6">
@@ -25,7 +27,11 @@ export default async function DashboardPage() {
       ) : (
         <div className="space-y-2">
           {items.map((item) => (
-            <WatchlistCard key={item.id} item={item} />
+            <WatchlistCard
+              key={item.id}
+              item={item}
+              snapshot={snapshots.get(item.id) ?? null}
+            />
           ))}
         </div>
       )}
