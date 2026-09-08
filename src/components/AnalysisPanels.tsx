@@ -305,6 +305,16 @@ function sentimentGaugeLabel(
   return "中立";
 }
 
+/** The headline takeaway of the sentiment panel: what the contrarian
+ *  read concludes, independent of the raw fear/greed reading above it. */
+function contrarianConclusion(score: number): { label: string; className: string } {
+  if (score > 0.5) return { label: "逆張り結論: 売り警戒", className: "bg-red-500/15 text-red-300" };
+  if (score > 0.15) return { label: "逆張り結論: やや売り警戒", className: "bg-red-500/10 text-red-300" };
+  if (score < -0.5) return { label: "逆張り結論: 買い好機", className: "bg-emerald-500/15 text-emerald-400" };
+  if (score < -0.15) return { label: "逆張り結論: やや買い好機", className: "bg-emerald-500/10 text-emerald-300" };
+  return { label: "逆張り結論: 中立", className: "bg-slate-700/50 text-slate-300" };
+}
+
 function SentimentCard({ data }: { data: SentimentResult }) {
   return (
     <Panel title="ニュースセンチメント（Dumb Money・逆張り指標）">
@@ -312,6 +322,17 @@ function SentimentCard({ data }: { data: SentimentResult }) {
         <Unavailable reason={data.reason} />
       ) : (
         <>
+          {(() => {
+            const conclusion = contrarianConclusion(data.score);
+            return (
+              <div
+                className={`mb-3 rounded-lg px-3 py-2 text-center text-sm font-semibold ${conclusion.className}`}
+              >
+                {conclusion.label}
+              </div>
+            );
+          })()}
+
           <SpeedometerGauge
             score={data.score}
             label={sentimentGaugeLabel(data)}
