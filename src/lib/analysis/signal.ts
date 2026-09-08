@@ -100,6 +100,13 @@ export async function runFullAnalysis(item: WatchlistItem): Promise<FullAnalysis
  *  expects (minus watchlistItemId), shared by the on-demand analyze route
  *  and the cron refresh route so they can't drift apart. */
 export function snapshotDataFrom(analysis: FullAnalysis) {
+  const findings = analysis.anomaly?.findings ?? [];
+  const divergenceSignal = findings.some((f) => f.type === "bearish_divergence")
+    ? "bearish"
+    : findings.some((f) => f.type === "bullish_divergence")
+      ? "bullish"
+      : null;
+
   return {
     technicalScore: analysis.technical?.score ?? null,
     fundamentalScore: analysis.fundamental.available ? analysis.fundamental.score : null,
@@ -108,6 +115,7 @@ export function snapshotDataFrom(analysis: FullAnalysis) {
     smartMoneyScore: analysis.smartMoney.available ? analysis.smartMoney.score : null,
     compositeScore: analysis.compositeScore,
     compositeLabel: analysis.compositeLabel,
+    divergenceSignal,
     rationale: analysis.rationale,
     rawDetails: JSON.stringify({
       technical: analysis.technical,

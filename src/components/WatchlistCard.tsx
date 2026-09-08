@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { WatchlistItem } from "@prisma/client";
+import type { SnapshotSummary } from "@/lib/snapshots";
 
 const ASSET_TYPE_LABEL: Record<WatchlistItem["assetType"], string> = {
   US_STOCK: "米国株",
@@ -19,7 +20,10 @@ const LABEL_BADGE_COLOR: Record<string, string> = {
   強い売り: "bg-red-500/15 text-red-400",
 };
 
-type SnapshotSummary = { compositeLabel: string | null; compositeScore: number | null };
+const DIVERGENCE_BADGE: Record<string, { label: string; className: string }> = {
+  bullish: { label: "📈 強気乖離", className: "bg-emerald-500/15 text-emerald-300" },
+  bearish: { label: "📉 弱気乖離", className: "bg-amber-500/15 text-amber-300" },
+};
 
 export function WatchlistCard({
   item,
@@ -63,6 +67,17 @@ export function WatchlistCard({
       </div>
 
       <div className="flex items-center gap-2">
+        {snapshot?.divergenceSignal && DIVERGENCE_BADGE[snapshot.divergenceSignal] && (
+          <span
+            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+              DIVERGENCE_BADGE[snapshot.divergenceSignal].className
+            }`}
+            title="RSIダイバージェンスを検出しました（詳細は銘柄ページのアノマリー分析欄）"
+          >
+            {DIVERGENCE_BADGE[snapshot.divergenceSignal].label}
+          </span>
+        )}
+
         {snapshot?.compositeLabel && (
           <span
             className={`rounded-full px-2.5 py-1 text-xs font-medium ${

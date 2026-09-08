@@ -566,6 +566,7 @@ function SmartMoneyCard({ data }: { data: SmartMoneyMetrics }) {
 
 const SEVERITY_BORDER: Record<string, string> = {
   info: "border-slate-600 text-slate-300",
+  opportunity: "border-emerald-500 text-emerald-300",
   warning: "border-amber-500 text-amber-200",
   alert: "border-red-500 text-red-300",
 };

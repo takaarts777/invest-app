@@ -55,6 +55,10 @@ model AnalysisSnapshot {
   smartMoneyScore  Float? // insider buy/sell reading ("Smart Money"), US stocks only
   compositeScore   Float?
   compositeLabel   String?
+  // "bullish" | "bearish" | null — set when analyzeAnomaly detects an RSI/
+  // price divergence, so the dashboard can badge it without parsing
+  // rawDetails JSON for every watchlist row.
+  divergenceSignal String?
 
   // LLM-generated rationale grounded in the scores/metrics above.
   rationale String?
