@@ -2,6 +2,7 @@ import { listWatchlist } from "@/lib/market";
 import { getLatestSnapshotsFor } from "@/lib/snapshots";
 import { AddTickerForm } from "@/components/AddTickerForm";
 import { WatchlistCard } from "@/components/WatchlistCard";
+import { MacroCalendar } from "@/components/MacroCalendar";
 
 export default async function DashboardPage() {
   const items = await listWatchlist();
@@ -17,6 +18,8 @@ export default async function DashboardPage() {
           気になる銘柄を追加すると、多面的な分析結果と買い時・売り時の目安を確認できます。
         </p>
       </div>
+
+      <MacroCalendar />
 
       <AddTickerForm />
 

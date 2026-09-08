@@ -8,6 +8,7 @@ import type { FundamentalMetrics } from "@/lib/analysis/fundamental";
 import type { SentimentResult } from "@/lib/analysis/sentiment";
 import type { SmartMoneyMetrics } from "@/lib/analysis/smartmoney";
 import type { AnomalyMetrics } from "@/lib/analysis/anomaly";
+import { SpeedometerGauge } from "@/components/SpeedometerGauge";
 
 type RawDetails = {
   technical: TechnicalMetrics | null;
@@ -60,14 +61,6 @@ function parseRawDetails(raw: string | null | undefined): RawDetails | null {
   }
 }
 
-const LABEL_COLOR: Record<string, string> = {
-  強い買い: "text-emerald-400",
-  買い: "text-emerald-300",
-  中立: "text-slate-300",
-  売り: "text-red-300",
-  強い売り: "text-red-400",
-};
-
 export function AnalysisPanels({
   watchlistItemId,
   initialSnapshot,
@@ -107,23 +100,7 @@ export function AnalysisPanels({
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs text-slate-500">総合判定</p>
-            {snapshot ? (
-              <p
-                className={`text-2xl font-semibold ${
-                  LABEL_COLOR[snapshot.compositeLabel ?? ""] ?? "text-slate-200"
-                }`}
-              >
-                {snapshot.compositeLabel}
-                <span className="ml-2 text-sm font-normal text-slate-500">
-                  (スコア {snapshot.compositeScore?.toFixed(2)})
-                </span>
-              </p>
-            ) : (
-              <p className="text-sm text-slate-500">まだ分析されていません</p>
-            )}
-          </div>
+          <p className="text-sm font-semibold text-slate-200">総合判定</p>
           <button
             onClick={handleAnalyze}
             disabled={pending}
@@ -133,24 +110,34 @@ export function AnalysisPanels({
           </button>
         </div>
 
-        {snapshot && <ScoreBar score={snapshot.compositeScore ?? 0} />}
-
         {error && (
           <p className="mt-2 text-sm text-red-400" role="alert">
             {error}
           </p>
         )}
 
-        {snapshot?.rationale && (
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
-            {snapshot.rationale}
-          </p>
-        )}
-
-        {snapshot && (
-          <p className="mt-2 text-xs text-slate-600">
-            {new Date(snapshot.computedAt).toLocaleString("ja-JP")} 時点の分析
-          </p>
+        {snapshot ? (
+          <div className="mt-3 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+            <SpeedometerGauge
+              score={snapshot.compositeScore ?? 0}
+              label={snapshot.compositeLabel ?? "-"}
+              sublabel={`スコア ${(snapshot.compositeScore ?? 0).toFixed(2)}`}
+              leftCaption="強い売り"
+              rightCaption="強い買い"
+            />
+            <div className="min-w-0 flex-1 text-center sm:text-left">
+              {snapshot.rationale && (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
+                  {snapshot.rationale}
+                </p>
+              )}
+              <p className="mt-2 text-xs text-slate-600">
+                {new Date(snapshot.computedAt).toLocaleString("ja-JP")} 時点の分析
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-slate-500">まだ分析されていません</p>
         )}
       </div>
 
@@ -165,42 +152,6 @@ export function AnalysisPanels({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function ScoreBar({ score }: { score: number }) {
-  return <Gauge score={score} leftLabel="強い売り" rightLabel="強い買い" />;
-}
-
-/** Fear-&-Greed-style horizontal gauge: a marker on a red→green track,
- *  with labeled endpoints. Reused for the composite score, the sentiment
- *  ("Dumb Money") reading, and the smart-money reading. */
-function Gauge({
-  score,
-  leftLabel,
-  rightLabel,
-  midLabel = "中立",
-}: {
-  score: number;
-  leftLabel: string;
-  rightLabel: string;
-  midLabel?: string;
-}) {
-  const pct = ((Math.min(1, Math.max(-1, score)) + 1) / 2) * 100;
-  return (
-    <div className="mt-3">
-      <div className="relative h-2 w-full rounded-full bg-gradient-to-r from-red-500 via-slate-600 to-emerald-500">
-        <div
-          className="absolute top-1/2 h-4 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow"
-          style={{ left: `${pct}%` }}
-        />
-      </div>
-      <div className="mt-1 flex justify-between text-[10px] text-slate-500">
-        <span>{leftLabel}</span>
-        <span>{midLabel}</span>
-        <span>{rightLabel}</span>
-      </div>
     </div>
   );
 }
@@ -315,6 +266,17 @@ function contrarianReading(score: number): string {
   return "中立圏 → 明確な逆張りシグナルなし";
 }
 
+function sentimentGaugeLabel(
+  data: Extract<SentimentResult, { available: true }>
+): string {
+  if (data.fearGreed) return data.fearGreed.classification;
+  if (data.score > 0.5) return "強欲";
+  if (data.score > 0.15) return "やや強欲";
+  if (data.score < -0.5) return "恐怖";
+  if (data.score < -0.15) return "やや恐怖";
+  return "中立";
+}
+
 function SentimentCard({ data }: { data: SentimentResult }) {
   return (
     <Panel title="ニュースセンチメント（Dumb Money・逆張り指標）">
@@ -322,8 +284,16 @@ function SentimentCard({ data }: { data: SentimentResult }) {
         <Unavailable reason={data.reason} />
       ) : (
         <>
-          <Gauge score={data.score} leftLabel="極度の恐怖" rightLabel="極度の強欲" />
-          <p className="mt-1 text-xs text-slate-500">{contrarianReading(data.score)}</p>
+          <SpeedometerGauge
+            score={data.score}
+            label={sentimentGaugeLabel(data)}
+            sublabel={`スコア ${data.score.toFixed(2)}`}
+            leftCaption="恐怖"
+            rightCaption="強欲"
+          />
+          <p className="mt-1 text-center text-xs text-slate-500 sm:text-left">
+            {contrarianReading(data.score)}
+          </p>
 
           {data.fearGreed && (
             <MetricRow
@@ -357,6 +327,12 @@ function SentimentCard({ data }: { data: SentimentResult }) {
   );
 }
 
+function smartMoneyGaugeLabel(score: number): string {
+  if (score > 0.3) return "買い優勢";
+  if (score < -0.3) return "売り優勢";
+  return "拮抗";
+}
+
 function SmartMoneyCard({ data }: { data: SmartMoneyMetrics }) {
   return (
     <Panel title="Smart Money（インサイダー取引）">
@@ -364,7 +340,13 @@ function SmartMoneyCard({ data }: { data: SmartMoneyMetrics }) {
         <Unavailable reason={data.reason} />
       ) : (
         <>
-          <Gauge score={data.score} leftLabel="売り優勢" rightLabel="買い優勢" />
+          <SpeedometerGauge
+            score={data.score}
+            label={smartMoneyGaugeLabel(data.score)}
+            sublabel={`スコア ${data.score.toFixed(2)}`}
+            leftCaption="売り優勢"
+            rightCaption="買い優勢"
+          />
           <div className="mt-3">
             <MetricRow
               label="買い"
