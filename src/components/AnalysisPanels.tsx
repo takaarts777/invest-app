@@ -571,24 +571,45 @@ const SEVERITY_BORDER: Record<string, string> = {
   alert: "border-red-500 text-red-300",
 };
 
+const DIVERGENCE_TYPES = ["bullish_divergence", "bearish_divergence"];
+
 function AnomalyCard({ data }: { data: AnomalyMetrics | null }) {
+  const divergenceFinding = data?.findings.find((f) => DIVERGENCE_TYPES.includes(f.type));
+  const otherFindings = data?.findings.filter((f) => !DIVERGENCE_TYPES.includes(f.type)) ?? [];
+
   return (
     <Panel title="アノマリー分析">
       {!data ? (
         <Unavailable reason="データ不足のため分析できませんでした。" />
-      ) : data.findings.length === 0 ? (
-        <p className="text-sm text-slate-500">特筆すべき異常は検出されませんでした。</p>
       ) : (
-        <ul className="space-y-2 text-sm">
-          {data.findings.map((f, i) => (
-            <li
-              key={i}
-              className={`border-l-2 pl-2 ${SEVERITY_BORDER[f.severity]}`}
-            >
-              {f.description}
-            </li>
-          ))}
-        </ul>
+        <>
+          {/* Always shown, found or not, so it's clear the check actually
+           *  ran — divergence only fires occasionally, so its absence
+           *  looked identical to "not implemented" without this. */}
+          <div
+            className={`mb-2 rounded-lg border-l-2 py-1 pl-2 text-sm ${
+              divergenceFinding
+                ? SEVERITY_BORDER[divergenceFinding.severity]
+                : "border-slate-700 text-slate-500"
+            }`}
+          >
+            {divergenceFinding
+              ? divergenceFinding.description
+              : "ダイバージェンス: 現在検出されていません（直近60営業日以内に価格とRSIの逆行は見られません）"}
+          </div>
+
+          {otherFindings.length === 0 ? (
+            <p className="text-sm text-slate-500">他に特筆すべき異常は検出されませんでした。</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {otherFindings.map((f, i) => (
+                <li key={i} className={`border-l-2 pl-2 ${SEVERITY_BORDER[f.severity]}`}>
+                  {f.description}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </Panel>
   );
