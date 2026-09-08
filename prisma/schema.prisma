@@ -34,6 +34,13 @@ model WatchlistItem {
   providerId  String
   addedAt     DateTime @default(now())
 
+  // Current holding, if any — this is a snapshot of your position now,
+  // not a transaction ledger. Both null means "watching only, not held".
+  // Set together via PATCH /api/watchlist/[id]; the portfolio page only
+  // lists items where quantity is set.
+  quantity   Float?
+  avgCostUsd Float? // average cost per unit, in USD
+
   snapshots AnalysisSnapshot[]
 
   @@unique([symbol, assetType])

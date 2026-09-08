@@ -5,19 +5,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { WatchlistItem } from "@prisma/client";
 import type { SnapshotSummary } from "@/lib/snapshots";
+import { LABEL_BADGE_COLOR } from "@/lib/signal-badge";
 
 const ASSET_TYPE_LABEL: Record<WatchlistItem["assetType"], string> = {
   US_STOCK: "米国株",
   LEVERAGED_ETF: "レバレッジETF",
   CRYPTO: "暗号資産",
-};
-
-const LABEL_BADGE_COLOR: Record<string, string> = {
-  強い買い: "bg-emerald-500/15 text-emerald-400",
-  買い: "bg-emerald-500/10 text-emerald-300",
-  中立: "bg-slate-700/50 text-slate-300",
-  売り: "bg-red-500/10 text-red-300",
-  強い売り: "bg-red-500/15 text-red-400",
 };
 
 const DIVERGENCE_BADGE: Record<string, { label: string; className: string }> = {

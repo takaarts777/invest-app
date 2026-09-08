@@ -10,9 +10,17 @@ export default function DashboardLayout({
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/90 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-          <Link href="/" className="text-base font-semibold text-slate-100">
-            投資アナリティクス
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="text-base font-semibold text-slate-100">
+              投資アナリティクス
+            </Link>
+            <Link
+              href="/portfolio"
+              className="text-sm text-slate-400 transition hover:text-slate-100"
+            >
+              ポートフォリオ
+            </Link>
+          </div>
           <form action={logout}>
             <button
               type="submit"

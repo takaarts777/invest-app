@@ -6,6 +6,11 @@ import { WatchlistCard } from "@/components/WatchlistCard";
 import { MacroCalendar } from "@/components/MacroCalendar";
 import { MarketOverview } from "@/components/MarketOverview";
 
+// The watchlist and market overview both change over time; force
+// per-request rendering rather than relying on Next's static/dynamic
+// inference from the fetch calls inside them.
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
   const items = await listWatchlist();
   const snapshots = await getLatestSnapshotsFor(items.map((i) => i.id));

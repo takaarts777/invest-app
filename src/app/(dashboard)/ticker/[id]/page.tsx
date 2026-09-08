@@ -4,6 +4,7 @@ import { getWatchlistItem } from "@/lib/market";
 import { getLatestSnapshot } from "@/lib/snapshots";
 import { PriceChart } from "@/components/PriceChart";
 import { AnalysisPanels } from "@/components/AnalysisPanels";
+import { HoldingForm } from "@/components/HoldingForm";
 
 const ASSET_TYPE_LABEL: Record<string, string> = {
   US_STOCK: "米国株",
@@ -37,6 +38,12 @@ export default async function TickerPage(props: PageProps<"/ticker/[id]">) {
       </div>
 
       <PriceChart watchlistItemId={item.id} />
+
+      <HoldingForm
+        itemId={item.id}
+        initialQuantity={item.quantity}
+        initialAvgCostUsd={item.avgCostUsd}
+      />
 
       <AnalysisPanels watchlistItemId={item.id} initialSnapshot={snapshot} />
     </div>

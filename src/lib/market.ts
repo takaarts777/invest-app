@@ -74,6 +74,27 @@ export function removeWatchlistItem(id: string) {
   return prisma.watchlistItem.delete({ where: { id } });
 }
 
+/** Sets or clears the current holding (quantity + average cost) for a
+ *  watchlist item. Pass both as `null` to clear the holding (item stays
+ *  on the watchlist, just drops off the portfolio page). */
+export function setHolding(
+  id: string,
+  holding: { quantity: number | null; avgCostUsd: number | null }
+) {
+  return prisma.watchlistItem.update({
+    where: { id },
+    data: { quantity: holding.quantity, avgCostUsd: holding.avgCostUsd },
+  });
+}
+
+/** Watchlist items that currently represent an actual holding. */
+export function listHoldings() {
+  return prisma.watchlistItem.findMany({
+    where: { quantity: { not: null } },
+    orderBy: { addedAt: "desc" },
+  });
+}
+
 export type Quote = {
   price: number;
   changePercent: number | null;
