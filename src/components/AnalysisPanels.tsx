@@ -325,7 +325,7 @@ function SentimentCard({ data }: { data: SentimentResult }) {
 
           {data.fearGreed && (
             <MetricRow
-              label="Fear & Greed指数"
+              label={`Fear & Greed指数（${data.fearGreed.source}）`}
               value={`${data.fearGreed.value}（${data.fearGreed.classification}）`}
             />
           )}

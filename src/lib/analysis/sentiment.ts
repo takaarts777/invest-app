@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { WatchlistItem } from "@prisma/client";
 import * as yahoo from "@/lib/providers/yahoo";
 import * as feargreed from "@/lib/providers/feargreed";
+import * as cnnfeargreed from "@/lib/providers/cnnfeargreed";
 
 export type SentimentResult =
   | {
@@ -12,14 +13,31 @@ export type SentimentResult =
       score: number;
       summary: string;
       headlines: { title: string; publisher: string; link: string }[];
-      /** Crypto only — alternative.me's market-wide Fear & Greed Index,
-       *  blended into `score` and shown as the "Dumb Money" read. */
-      fearGreed: { value: number; classification: string } | null;
+      /** A real, established market-wide Fear & Greed index (not derived
+       *  from the headlines above), blended into `score`. CNN's index for
+       *  US_STOCK/LEVERAGED_ETF (S&P 500-wide), alternative.me's for
+       *  CRYPTO — both are shown as the "Dumb Money" read. */
+      fearGreed: { value: number; classification: string; source: string } | null;
       /** false when ANTHROPIC_API_KEY isn't set — headlines/fear-greed are
        *  still shown, just without an AI-scored headline read or summary. */
       aiSummaryAvailable: boolean;
     }
   | { available: false; reason: string };
+
+async function fetchMarketFearGreed(
+  assetType: WatchlistItem["assetType"]
+): Promise<{ value: number; classification: string; source: string } | null> {
+  try {
+    if (assetType === "CRYPTO") {
+      const r = await feargreed.fetchFearGreedIndex();
+      return { value: r.value, classification: r.classification, source: "Alternative.me" };
+    }
+    const r = await cnnfeargreed.fetchCnnFearGreedIndex();
+    return { value: r.value, classification: r.classification, source: "CNN" };
+  } catch {
+    return null;
+  }
+}
 
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
@@ -88,7 +106,7 @@ export async function analyzeSentiment(
 
   const [newsResult, fearGreedResult] = await Promise.allSettled([
     yahoo.searchNews(query, 8),
-    item.assetType === "CRYPTO" ? feargreed.fetchFearGreedIndex() : Promise.resolve(null),
+    fetchMarketFearGreed(item.assetType),
   ]);
 
   const news = newsResult.status === "fulfilled" ? newsResult.value : [];
@@ -136,7 +154,7 @@ export async function analyzeSentiment(
   if (aiSummary) summaryParts.push(aiSummary);
   if (fearGreed) {
     summaryParts.push(
-      `Fear & Greed指数: ${fearGreed.value}（${fearGreed.classification}）`
+      `Fear & Greed指数(${fearGreed.source}): ${fearGreed.value}（${fearGreed.classification}）`
     );
   }
   if (!aiSummaryAvailable && headlines.length > 0) {
@@ -150,7 +168,7 @@ export async function analyzeSentiment(
     score,
     summary: summaryParts.join(" ") || "分析材料が不足しています。",
     headlines,
-    fearGreed: fearGreed ? { value: fearGreed.value, classification: fearGreed.classification } : null,
+    fearGreed,
     aiSummaryAvailable,
   };
 }
