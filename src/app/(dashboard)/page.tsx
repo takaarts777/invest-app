@@ -1,12 +1,15 @@
 import { listWatchlist } from "@/lib/market";
 import { getLatestSnapshotsFor } from "@/lib/snapshots";
+import { getMarketOverview } from "@/lib/market-overview";
 import { AddTickerForm } from "@/components/AddTickerForm";
 import { WatchlistCard } from "@/components/WatchlistCard";
 import { MacroCalendar } from "@/components/MacroCalendar";
+import { MarketOverview } from "@/components/MarketOverview";
 
 export default async function DashboardPage() {
   const items = await listWatchlist();
   const snapshots = await getLatestSnapshotsFor(items.map((i) => i.id));
+  const marketOverview = await getMarketOverview();
 
   return (
     <div className="space-y-6">
@@ -18,6 +21,8 @@ export default async function DashboardPage() {
           気になる銘柄を追加すると、多面的な分析結果と買い時・売り時の目安を確認できます。
         </p>
       </div>
+
+      <MarketOverview data={marketOverview} />
 
       <MacroCalendar />
 

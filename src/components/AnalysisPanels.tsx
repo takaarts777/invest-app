@@ -540,6 +540,12 @@ function SmartMoneyCard({ data }: { data: SmartMoneyMetrics }) {
         <Unavailable reason={data.reason} />
       ) : (
         <>
+          {data.scope === "sector" && (
+            <p className="mb-2 text-xs text-slate-500">
+              ETF自体にはインサイダーが存在しないため、{data.sectorName}
+              の代表的な構成銘柄で代用集計しています。
+            </p>
+          )}
           <SpeedometerGauge
             score={data.score}
             label={smartMoneyGaugeLabel(data.score)}
