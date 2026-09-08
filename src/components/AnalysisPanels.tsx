@@ -17,10 +17,44 @@ type RawDetails = {
   anomaly: AnomalyMetrics | null;
 };
 
+const STALE_REASON =
+  "古い形式の分析結果です。「再分析する」を押して更新してください。";
+
+/** rawDetails is a JSON blob whose shape has changed as the analysis
+ *  modules evolved (e.g. sentiment used to be nullable, smartMoney didn't
+ *  exist yet). Snapshots saved under an older shape must not crash the
+ *  page — normalize any missing/mismatched `{available: ...}` field into
+ *  an explicit "unavailable" reading instead. */
+function normalizeAvailable<T extends { available: boolean }>(
+  value: unknown,
+  extraFallbackFields: Record<string, unknown> = {}
+): T {
+  if (value && typeof value === "object" && "available" in value) {
+    return value as T;
+  }
+  return {
+    available: false,
+    reason: STALE_REASON,
+    ...extraFallbackFields,
+  } as unknown as T;
+}
+
 function parseRawDetails(raw: string | null | undefined): RawDetails | null {
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as RawDetails;
+    const parsed = JSON.parse(raw) as Partial<RawDetails> | null;
+    if (!parsed) return null;
+    return {
+      technical: parsed.technical ?? null,
+      // FundamentalMetrics's unavailable variant also carries a `kind`
+      // discriminant that sentiment/smartMoney don't have.
+      fundamental: normalizeAvailable<FundamentalMetrics>(parsed.fundamental, {
+        kind: "unavailable",
+      }),
+      sentiment: normalizeAvailable<SentimentResult>(parsed.sentiment),
+      smartMoney: normalizeAvailable<SmartMoneyMetrics>(parsed.smartMoney),
+      anomaly: parsed.anomaly ?? null,
+    };
   } catch {
     return null;
   }
