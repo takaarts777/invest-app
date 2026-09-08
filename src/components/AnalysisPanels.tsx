@@ -169,6 +169,8 @@ export function AnalysisPanels({
         )}
       </div>
 
+      {details && <SentimentCard data={details.sentiment} />}
+
       {details && (
         <SmartDumbCompare
           smartMoney={details.smartMoney}
@@ -180,8 +182,9 @@ export function AnalysisPanels({
         <div className="grid gap-3 sm:grid-cols-2">
           <TechnicalCard data={details.technical} />
           <FundamentalCard data={details.fundamental} />
-          <SentimentCard data={details.sentiment} />
-          <AnomalyCard data={details.anomaly} />
+          <div className="sm:col-span-2">
+            <AnomalyCard data={details.anomaly} />
+          </div>
           <div className="sm:col-span-2">
             <SmartMoneyCard data={details.smartMoney} />
           </div>
@@ -473,27 +476,34 @@ function SentimentCard({ data }: { data: SentimentResult }) {
         <Unavailable reason={data.reason} />
       ) : (
         <>
-          {(() => {
-            const conclusion = contrarianConclusion(data.score);
-            return (
-              <div
-                className={`mb-3 rounded-lg px-3 py-2 text-center text-sm font-semibold ${conclusion.className}`}
-              >
-                {conclusion.label}
-              </div>
-            );
-          })()}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs text-slate-500">現在の読み</p>
+              <p className="text-xl font-semibold text-slate-100">
+                {sentimentGaugeLabel(data)}
+                <span className="ml-2 text-sm font-normal text-slate-500">
+                  (スコア {data.score.toFixed(2)})
+                </span>
+              </p>
+            </div>
 
-          <SpeedometerGauge
-            score={data.score}
-            label={sentimentGaugeLabel(data)}
-            sublabel={`スコア ${data.score.toFixed(2)}`}
-            leftCaption="恐怖"
-            rightCaption="強欲"
-          />
-          <p className="mt-1 text-center text-xs text-slate-500 sm:text-left">
-            {contrarianReading(data.score)}
-          </p>
+            {(() => {
+              const conclusion = contrarianConclusion(data.score);
+              return (
+                <span
+                  className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${conclusion.className}`}
+                >
+                  {conclusion.label}
+                </span>
+              );
+            })()}
+          </div>
+
+          {/* Same horizontal bar style as the composite-judgment card,
+           *  per feedback, in place of the speedometer dial. */}
+          <ScoreBar score={data.score} />
+
+          <p className="mt-1 text-xs text-slate-500">{contrarianReading(data.score)}</p>
 
           {data.fearGreed && (
             <MetricRow
