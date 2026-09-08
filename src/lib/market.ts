@@ -37,11 +37,20 @@ async function resolveSymbol(
   }
 }
 
-export async function addWatchlistItem(symbol: string, assetType: AssetType) {
+export async function addWatchlistItem(
+  symbol: string,
+  assetType: AssetType,
+  /** When the user picked a specific result from the ticker-search
+   *  autocomplete, use it directly instead of re-resolving by symbol —
+   *  this matters most for crypto, where several tokens can share a
+   *  ticker and re-searching by symbol text alone could land on a
+   *  different coin than the one the user actually selected. */
+  hint?: { providerId: string; displayName: string }
+) {
   const trimmed = symbol.trim();
   if (!trimmed) throw new Error("銘柄コードを入力してください。");
 
-  const { providerId, displayName } = await resolveSymbol(trimmed, assetType);
+  const { providerId, displayName } = hint ?? (await resolveSymbol(trimmed, assetType));
 
   return prisma.watchlistItem.create({
     data: {

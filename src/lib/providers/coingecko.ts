@@ -24,20 +24,35 @@ export type CoinSearchResult = {
   name: string;
 };
 
-/** Resolves a user-entered ticker (e.g. "BTC") to a CoinGecko coin id. */
-export async function searchCoin(
-  query: string
-): Promise<CoinSearchResult | null> {
+async function rawCoinSearch(query: string): Promise<CoinSearchResult[]> {
   const data = await coingeckoFetch<{ coins: CoinSearchResult[] }>(
     `/search?query=${encodeURIComponent(query)}`
   );
-  if (!data.coins?.length) return null;
+  return data.coins ?? [];
+}
+
+/** Resolves a user-entered ticker (e.g. "BTC") to a CoinGecko coin id. */
+export async function searchCoin(query: string): Promise<CoinSearchResult | null> {
+  const coins = await rawCoinSearch(query);
+  if (!coins.length) return null;
 
   const lower = query.trim().toLowerCase();
   // Prefer an exact symbol match (search results are already ranked by
   // market cap, so this picks the best-known coin for ambiguous tickers).
-  const exact = data.coins.find((c) => c.symbol.toLowerCase() === lower);
-  return exact ?? data.coins[0];
+  const exact = coins.find((c) => c.symbol.toLowerCase() === lower);
+  return exact ?? coins[0];
+}
+
+/** Multiple candidates for the add-ticker autocomplete — unlike
+ *  searchCoin(), this doesn't guess a single best match, since many
+ *  tickers (e.g. "SOL") are shared by several unrelated tokens and the
+ *  user should pick the right one themselves. */
+export async function searchCoins(
+  query: string,
+  count = 8
+): Promise<CoinSearchResult[]> {
+  const coins = await rawCoinSearch(query);
+  return coins.slice(0, count);
 }
 
 export async function fetchCoinPrice(id: string) {

@@ -130,3 +130,67 @@ export async function searchNews(
     };
   });
 }
+
+export type QuoteSearchResult = {
+  symbol: string;
+  name: string;
+  exchange: string;
+};
+
+// Yahoo exchange codes we treat as "US-listed" — foreign cross-listings
+// (Germany, London, Buenos Aires, ...) show up in unfiltered results and
+// aren't fetchable via our chart/quote endpoints the same way.
+const US_EXCHANGES = new Set(["NMS", "NYQ", "NGM", "ASE", "PCX", "BTS", "NCM", "PNK"]);
+
+/**
+ * Ticker/company-name autocomplete for the add-ticker search box. Free,
+ * no API key — same Yahoo search endpoint as searchNews, with
+ * quotesCount instead of newsCount.
+ */
+export async function searchQuotes(
+  query: string,
+  count = 8
+): Promise<QuoteSearchResult[]> {
+  const url = `${SEARCH_URL}?q=${encodeURIComponent(
+    query
+  )}&quotesCount=${count}&newsCount=0`;
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Yahoo Finance quote search error (${res.status}) for ${query}`);
+  }
+
+  const data = await res.json();
+  const quotes: unknown[] = data?.quotes ?? [];
+
+  return quotes
+    .map((q) => {
+      const item = q as {
+        symbol?: string;
+        shortname?: string;
+        longname?: string;
+        exchange?: string;
+        quoteType?: string;
+      };
+      return {
+        symbol: item.symbol ?? "",
+        name: item.longname ?? item.shortname ?? item.symbol ?? "",
+        exchange: item.exchange ?? "",
+        quoteType: item.quoteType ?? "",
+      };
+    })
+    .filter(
+      (q) =>
+        q.symbol &&
+        !q.symbol.includes(".") &&
+        US_EXCHANGES.has(q.exchange) &&
+        (q.quoteType === "EQUITY" || q.quoteType === "ETF")
+    )
+    .map(({ symbol, name, exchange }) => ({ symbol, name, exchange }));
+}

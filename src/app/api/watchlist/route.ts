@@ -21,6 +21,10 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const symbol = typeof body?.symbol === "string" ? body.symbol : null;
   const assetType = body?.assetType as AssetType | undefined;
+  // Set when the user picked a specific result from the ticker-search
+  // autocomplete rather than typing a bare symbol.
+  const providerId = typeof body?.providerId === "string" ? body.providerId : null;
+  const displayName = typeof body?.displayName === "string" ? body.displayName : null;
 
   if (!symbol || !assetType || !VALID_ASSET_TYPES.includes(assetType)) {
     return NextResponse.json(
@@ -30,7 +34,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const item = await addWatchlistItem(symbol, assetType);
+    const hint = providerId && displayName ? { providerId, displayName } : undefined;
+    const item = await addWatchlistItem(symbol, assetType, hint);
     return NextResponse.json({ item }, { status: 201 });
   } catch (error) {
     if (
