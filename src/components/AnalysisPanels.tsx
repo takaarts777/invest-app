@@ -6,13 +6,14 @@ import type { AnalysisSnapshot } from "@prisma/client";
 import type { TechnicalMetrics } from "@/lib/analysis/technical";
 import type { FundamentalMetrics } from "@/lib/analysis/fundamental";
 import type { SentimentResult } from "@/lib/analysis/sentiment";
+import type { SmartMoneyMetrics } from "@/lib/analysis/smartmoney";
 import type { AnomalyMetrics } from "@/lib/analysis/anomaly";
 
 type RawDetails = {
   technical: TechnicalMetrics | null;
   fundamental: FundamentalMetrics;
-  sentiment: SentimentResult | null;
-  sentimentError: string | null;
+  sentiment: SentimentResult;
+  smartMoney: SmartMoneyMetrics;
   anomaly: AnomalyMetrics | null;
 };
 
@@ -123,8 +124,11 @@ export function AnalysisPanels({
         <div className="grid gap-3 sm:grid-cols-2">
           <TechnicalCard data={details.technical} />
           <FundamentalCard data={details.fundamental} />
-          <SentimentCard data={details.sentiment} error={details.sentimentError} />
+          <SentimentCard data={details.sentiment} />
           <AnomalyCard data={details.anomaly} />
+          <div className="sm:col-span-2">
+            <SmartMoneyCard data={details.smartMoney} />
+          </div>
         </div>
       )}
     </div>
@@ -132,13 +136,37 @@ export function AnalysisPanels({
 }
 
 function ScoreBar({ score }: { score: number }) {
+  return <Gauge score={score} leftLabel="強い売り" rightLabel="強い買い" />;
+}
+
+/** Fear-&-Greed-style horizontal gauge: a marker on a red→green track,
+ *  with labeled endpoints. Reused for the composite score, the sentiment
+ *  ("Dumb Money") reading, and the smart-money reading. */
+function Gauge({
+  score,
+  leftLabel,
+  rightLabel,
+  midLabel = "中立",
+}: {
+  score: number;
+  leftLabel: string;
+  rightLabel: string;
+  midLabel?: string;
+}) {
   const pct = ((Math.min(1, Math.max(-1, score)) + 1) / 2) * 100;
   return (
-    <div className="relative mt-3 h-2 w-full rounded-full bg-gradient-to-r from-red-500 via-slate-600 to-emerald-500">
-      <div
-        className="absolute top-1/2 h-4 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow"
-        style={{ left: `${pct}%` }}
-      />
+    <div className="mt-3">
+      <div className="relative h-2 w-full rounded-full bg-gradient-to-r from-red-500 via-slate-600 to-emerald-500">
+        <div
+          className="absolute top-1/2 h-4 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow"
+          style={{ left: `${pct}%` }}
+        />
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] text-slate-500">
+        <span>{leftLabel}</span>
+        <span>{midLabel}</span>
+        <span>{rightLabel}</span>
+      </div>
     </div>
   );
 }
@@ -245,23 +273,33 @@ function FundamentalCard({ data }: { data: FundamentalMetrics }) {
   );
 }
 
-function SentimentCard({
-  data,
-  error,
-}: {
-  data: SentimentResult | null;
-  error: string | null;
-}) {
+function contrarianReading(score: number): string {
+  if (score > 0.5) return "過熱（強欲）気味 → 逆張り的には売り・様子見の検討材料";
+  if (score > 0.15) return "やや強気 → 逆張り的にはやや警戒";
+  if (score < -0.5) return "悲観（恐怖）気味 → 逆張り的には買いの好機の可能性";
+  if (score < -0.15) return "やや弱気 → 逆張り的にはやや好機";
+  return "中立圏 → 明確な逆張りシグナルなし";
+}
+
+function SentimentCard({ data }: { data: SentimentResult }) {
   return (
-    <Panel title="ニュースセンチメント">
-      {error ? (
-        <Unavailable reason={error} />
-      ) : !data ? (
-        <Unavailable reason="分析できませんでした。" />
+    <Panel title="ニュースセンチメント（Dumb Money・逆張り指標）">
+      {!data.available ? (
+        <Unavailable reason={data.reason} />
       ) : (
         <>
-          <MetricRow label="スコア" value={fmt(data.score)} />
+          <Gauge score={data.score} leftLabel="極度の恐怖" rightLabel="極度の強欲" />
+          <p className="mt-1 text-xs text-slate-500">{contrarianReading(data.score)}</p>
+
+          {data.fearGreed && (
+            <MetricRow
+              label="Fear & Greed指数"
+              value={`${data.fearGreed.value}（${data.fearGreed.classification}）`}
+            />
+          )}
+
           <p className="mt-2 text-sm text-slate-300">{data.summary}</p>
+
           {data.headlines.length > 0 && (
             <ul className="mt-2 space-y-1 text-xs text-slate-500">
               {data.headlines.slice(0, 5).map((h, i) => (
@@ -279,6 +317,31 @@ function SentimentCard({
               ))}
             </ul>
           )}
+        </>
+      )}
+    </Panel>
+  );
+}
+
+function SmartMoneyCard({ data }: { data: SmartMoneyMetrics }) {
+  return (
+    <Panel title="Smart Money（インサイダー取引）">
+      {!data.available ? (
+        <Unavailable reason={data.reason} />
+      ) : (
+        <>
+          <Gauge score={data.score} leftLabel="売り優勢" rightLabel="買い優勢" />
+          <div className="mt-3">
+            <MetricRow
+              label="買い"
+              value={`${data.buyCount}件 / ${fmtUsd(data.buyValueUsd)}`}
+            />
+            <MetricRow
+              label="売り"
+              value={`${data.sellCount}件 / ${fmtUsd(data.sellValueUsd)}`}
+            />
+          </div>
+          <SignalList items={data.signals} />
         </>
       )}
     </Panel>

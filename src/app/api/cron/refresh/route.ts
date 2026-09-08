@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { listWatchlist } from "@/lib/market";
-import { runFullAnalysis } from "@/lib/analysis/signal";
+import { runFullAnalysis, snapshotDataFrom } from "@/lib/analysis/signal";
 
 // Triggered by Vercel Cron (see vercel.json) to keep every watchlist
 // item's analysis snapshot fresh without the user needing to open each
@@ -23,25 +23,7 @@ export async function GET(request: Request) {
     try {
       const analysis = await runFullAnalysis(item);
       await prisma.analysisSnapshot.create({
-        data: {
-          watchlistItemId: item.id,
-          technicalScore: analysis.technical?.score ?? null,
-          fundamentalScore: analysis.fundamental.available
-            ? analysis.fundamental.score
-            : null,
-          sentimentScore: analysis.sentiment?.score ?? null,
-          anomalyScore: analysis.anomaly?.score ?? null,
-          compositeScore: analysis.compositeScore,
-          compositeLabel: analysis.compositeLabel,
-          rationale: analysis.rationale,
-          rawDetails: JSON.stringify({
-            technical: analysis.technical,
-            fundamental: analysis.fundamental,
-            sentiment: analysis.sentiment,
-            sentimentError: analysis.sentimentError,
-            anomaly: analysis.anomaly,
-          }),
-        },
+        data: { watchlistItemId: item.id, ...snapshotDataFrom(analysis) },
       });
       results.push({ id: item.id, symbol: item.symbol, ok: true });
     } catch (error) {

@@ -27,7 +27,16 @@ async function finnhubFetch<T>(path: string, params: Record<string, string>) {
 
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
-    throw new Error(`Finnhub API error (${res.status}): ${path}`);
+    // Finnhub returns a JSON body like {"error":"You don't have access to
+    // this resource."} for plan-restricted endpoints — surface that
+    // instead of a bare status code where possible.
+    const detail = await res
+      .json()
+      .then((body: { error?: string }) => body.error)
+      .catch(() => null);
+    throw new Error(
+      `Finnhub APIエラー (${res.status})${detail ? `: ${detail}` : ""} — ${path}`
+    );
   }
   return (await res.json()) as T;
 }
@@ -102,4 +111,28 @@ export async function fetchCompanyNews(
   to: string
 ): Promise<FinnhubNewsItem[]> {
   return finnhubFetch<FinnhubNewsItem[]>("/company-news", { symbol, from, to });
+}
+
+// Insider transactions (Form 4 filings), free tier. Used as the "Smart
+// Money" proxy — open-market buys/sells by officers, directors, and large
+// shareholders are public and are a genuinely directional (non-contrarian)
+// signal, unlike crowd sentiment.
+export type FinnhubInsiderTransaction = {
+  name?: string;
+  share?: number;
+  change?: number;
+  filingDate?: string;
+  transactionDate?: string;
+  transactionCode?: string; // "P" = open-market purchase, "S" = open-market sale
+  transactionPrice?: number;
+};
+
+export async function fetchInsiderTransactions(
+  symbol: string
+): Promise<FinnhubInsiderTransaction[]> {
+  const data = await finnhubFetch<{ data?: FinnhubInsiderTransaction[] }>(
+    "/stock/insider-transactions",
+    { symbol }
+  );
+  return data.data ?? [];
 }

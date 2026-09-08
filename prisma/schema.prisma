@@ -29,7 +29,7 @@ model WatchlistItem {
   assetType   AssetType
   displayName String?
   // Provider-specific lookup key:
-  // - US_STOCK / LEVERAGED_ETF: the Stooq symbol, e.g. "aapl.us"
+  // - US_STOCK / LEVERAGED_ETF: the ticker as Yahoo Finance expects it, e.g. "AAPL"
   // - CRYPTO: the CoinGecko coin id, e.g. "bitcoin" (resolved at add time)
   providerId  String
   addedAt     DateTime @default(now())
@@ -50,8 +50,9 @@ model AnalysisSnapshot {
 
   technicalScore   Float?
   fundamentalScore Float?
-  sentimentScore   Float?
+  sentimentScore   Float? // raw crowd-sentiment reading ("Dumb Money"); composite uses its sign-flipped contrarian value
   anomalyScore     Float?
+  smartMoneyScore  Float? // insider buy/sell reading ("Smart Money"), US stocks only
   compositeScore   Float?
   compositeLabel   String?
 
