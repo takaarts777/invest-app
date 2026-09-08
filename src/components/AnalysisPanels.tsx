@@ -170,6 +170,13 @@ export function AnalysisPanels({
       </div>
 
       {details && (
+        <SmartDumbCompare
+          smartMoney={details.smartMoney}
+          sentiment={details.sentiment}
+        />
+      )}
+
+      {details && (
         <div className="grid gap-3 sm:grid-cols-2">
           <TechnicalCard data={details.technical} />
           <FundamentalCard data={details.fundamental} />
@@ -189,6 +196,150 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
     <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
       <h3 className="mb-2 text-sm font-semibold text-slate-200">{title}</h3>
       {children}
+    </div>
+  );
+}
+
+/** A labeled dot placed above or below the shared track at the position
+ *  corresponding to `score`, so two readings on the same -1..1 scale can
+ *  be compared at a glance. */
+function CompareMarker({
+  score,
+  colorClass,
+  label,
+  position,
+}: {
+  score: number;
+  colorClass: string;
+  label: string;
+  position: "above" | "below";
+}) {
+  const pct = ((Math.min(1, Math.max(-1, score)) + 1) / 2) * 100;
+  return (
+    <div
+      className="absolute flex flex-col items-center"
+      style={{
+        left: `${pct}%`,
+        top: position === "above" ? "-28px" : "12px",
+        transform: "translateX(-50%)",
+      }}
+    >
+      {position === "above" && (
+        <span
+          className={`mb-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-semibold text-slate-900 ${colorClass}`}
+        >
+          {label}
+        </span>
+      )}
+      <span className={`h-3 w-3 rounded-full ${colorClass} shadow`} />
+      {position === "below" && (
+        <span
+          className={`mt-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-semibold text-slate-900 ${colorClass}`}
+        >
+          {label}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Reads how Smart Money (insider buy/sell) and Dumb Money (contrarian-
+ *  adjusted crowd sentiment) sit relative to each other — agreement
+ *  reinforces the read, divergence suggests caution. */
+function agreementReading(
+  smart: number,
+  dumb: number
+): { text: string; className: string } {
+  if (Math.abs(smart) <= 0.15 || Math.abs(dumb) <= 0.15) {
+    return {
+      text: "どちらかが中立圏のため、明確な一致・乖離は見られません。",
+      className: "text-slate-400",
+    };
+  }
+  if (Math.sign(smart) === Math.sign(dumb)) {
+    return {
+      text:
+        smart > 0
+          ? "Smart Money・Dumb Money(逆張り換算)がともに買い方向で一致 → シグナルの信頼度は比較的高い"
+          : "Smart Money・Dumb Money(逆張り換算)がともに売り方向で一致 → シグナルの信頼度は比較的高い",
+      className: smart > 0 ? "text-emerald-300" : "text-red-300",
+    };
+  }
+  return {
+    text: "Smart MoneyとDumb Money(逆張り換算)の方向が乖離しています → 判断が割れているため様子見も選択肢",
+    className: "text-amber-300",
+  };
+}
+
+/** A dedicated Smart Money vs. Dumb Money comparison, separate from the
+ *  news sentiment panel — meant to be followed on its own for timing,
+ *  with Smart Money (insider trading) as the primary cue. */
+function SmartDumbCompare({
+  smartMoney,
+  sentiment,
+}: {
+  smartMoney: SmartMoneyMetrics;
+  sentiment: SentimentResult;
+}) {
+  const smartScore = smartMoney.available ? smartMoney.score : null;
+  // Contrarian-adjusted so positive consistently means "bullish signal"
+  // on this track, matching how it's folded into the composite score.
+  const dumbScore = sentiment.available ? -sentiment.score : null;
+
+  if (smartScore === null && dumbScore === null) return null;
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+      <h3 className="text-sm font-semibold text-slate-200">
+        Smart Money vs Dumb Money
+      </h3>
+      <p className="mt-1 text-xs text-slate-500">
+        2つのシグナルの位置関係を比較します。投資判断はSmart Money(インサイダー)を軸に、Dumb
+        Money(逆張り換算後のニュースセンチメント)は補助材料としてご活用ください。
+      </p>
+
+      <div className="relative mx-2 mt-10 mb-8 h-2 rounded-full bg-gradient-to-r from-red-500 via-slate-600 to-emerald-500">
+        {smartScore !== null && (
+          <CompareMarker
+            score={smartScore}
+            colorClass="bg-sky-400"
+            label="Smart"
+            position="above"
+          />
+        )}
+        {dumbScore !== null && (
+          <CompareMarker
+            score={dumbScore}
+            colorClass="bg-amber-400"
+            label="Dumb"
+            position="below"
+          />
+        )}
+      </div>
+
+      <div className="flex justify-between text-[10px] text-slate-500">
+        <span>売りシグナル</span>
+        <span>中立</span>
+        <span>買いシグナル</span>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-400">
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-sky-400" />
+          Smart Money{smartScore !== null ? `（${smartScore.toFixed(2)}）` : "（データなし）"}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-amber-400" />
+          Dumb Money・逆張り換算
+          {dumbScore !== null ? `（${dumbScore.toFixed(2)}）` : "（データなし）"}
+        </span>
+      </div>
+
+      {smartScore !== null && dumbScore !== null && (
+        <p className={`mt-3 text-sm ${agreementReading(smartScore, dumbScore).className}`}>
+          {agreementReading(smartScore, dumbScore).text}
+        </p>
+      )}
     </div>
   );
 }
