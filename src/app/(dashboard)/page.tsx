@@ -7,6 +7,7 @@ import { MacroCalendar } from "@/components/MacroCalendar";
 import { MarketOverview } from "@/components/MarketOverview";
 import { SectorHeatmap } from "@/components/SectorHeatmap";
 import { getSectorHeatmap } from "@/lib/sector-heatmap";
+import { RatePredictor } from "@/components/RatePredictor";
 
 // The watchlist and market overview both change over time; force
 // per-request rendering rather than relying on Next's static/dynamic
@@ -31,6 +32,8 @@ export default async function DashboardPage() {
       </div>
 
       <MarketOverview data={marketOverview} />
+
+      <RatePredictor />
 
       <MacroCalendar />
 
