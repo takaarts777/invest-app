@@ -61,6 +61,28 @@ function parseRawDetails(raw: string | null | undefined): RawDetails | null {
   }
 }
 
+const LABEL_COLOR: Record<string, string> = {
+  強い買い: "text-emerald-400",
+  買い: "text-emerald-300",
+  中立: "text-slate-300",
+  売り: "text-red-300",
+  強い売り: "text-red-400",
+};
+
+/** Horizontal bar gauge used for the composite score (kept separate from
+ *  the newer speedometer-style gauge used for sentiment/smart-money). */
+function ScoreBar({ score }: { score: number }) {
+  const pct = ((Math.min(1, Math.max(-1, score)) + 1) / 2) * 100;
+  return (
+    <div className="relative mt-3 h-2 w-full rounded-full bg-gradient-to-r from-red-500 via-slate-600 to-emerald-500">
+      <div
+        className="absolute top-1/2 h-4 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow"
+        style={{ left: `${pct}%` }}
+      />
+    </div>
+  );
+}
+
 export function AnalysisPanels({
   watchlistItemId,
   initialSnapshot,
@@ -100,7 +122,23 @@ export function AnalysisPanels({
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-slate-200">総合判定</p>
+          <div>
+            <p className="text-xs text-slate-500">総合判定</p>
+            {snapshot ? (
+              <p
+                className={`text-2xl font-semibold ${
+                  LABEL_COLOR[snapshot.compositeLabel ?? ""] ?? "text-slate-200"
+                }`}
+              >
+                {snapshot.compositeLabel}
+                <span className="ml-2 text-sm font-normal text-slate-500">
+                  (スコア {snapshot.compositeScore?.toFixed(2)})
+                </span>
+              </p>
+            ) : (
+              <p className="text-sm text-slate-500">まだ分析されていません</p>
+            )}
+          </div>
           <button
             onClick={handleAnalyze}
             disabled={pending}
@@ -110,34 +148,24 @@ export function AnalysisPanels({
           </button>
         </div>
 
+        {snapshot && <ScoreBar score={snapshot.compositeScore ?? 0} />}
+
         {error && (
           <p className="mt-2 text-sm text-red-400" role="alert">
             {error}
           </p>
         )}
 
-        {snapshot ? (
-          <div className="mt-3 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-            <SpeedometerGauge
-              score={snapshot.compositeScore ?? 0}
-              label={snapshot.compositeLabel ?? "-"}
-              sublabel={`スコア ${(snapshot.compositeScore ?? 0).toFixed(2)}`}
-              leftCaption="強い売り"
-              rightCaption="強い買い"
-            />
-            <div className="min-w-0 flex-1 text-center sm:text-left">
-              {snapshot.rationale && (
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
-                  {snapshot.rationale}
-                </p>
-              )}
-              <p className="mt-2 text-xs text-slate-600">
-                {new Date(snapshot.computedAt).toLocaleString("ja-JP")} 時点の分析
-              </p>
-            </div>
-          </div>
-        ) : (
-          <p className="mt-3 text-sm text-slate-500">まだ分析されていません</p>
+        {snapshot?.rationale && (
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
+            {snapshot.rationale}
+          </p>
+        )}
+
+        {snapshot && (
+          <p className="mt-2 text-xs text-slate-600">
+            {new Date(snapshot.computedAt).toLocaleString("ja-JP")} 時点の分析
+          </p>
         )}
       </div>
 
