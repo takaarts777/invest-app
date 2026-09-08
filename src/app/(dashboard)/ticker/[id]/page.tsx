@@ -39,13 +39,13 @@ export default async function TickerPage(props: PageProps<"/ticker/[id]">) {
 
       <PriceChart watchlistItemId={item.id} />
 
+      <AnalysisPanels watchlistItemId={item.id} initialSnapshot={snapshot} />
+
       <HoldingForm
         itemId={item.id}
         initialQuantity={item.quantity}
         initialAvgCostUsd={item.avgCostUsd}
       />
-
-      <AnalysisPanels watchlistItemId={item.id} initialSnapshot={snapshot} />
     </div>
   );
 }
