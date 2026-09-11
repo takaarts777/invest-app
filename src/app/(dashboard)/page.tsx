@@ -8,6 +8,7 @@ import { MarketOverview } from "@/components/MarketOverview";
 import { SectorHeatmap } from "@/components/SectorHeatmap";
 import { getSectorHeatmap } from "@/lib/sector-heatmap";
 import { RatePredictor } from "@/components/RatePredictor";
+import { ZbtIndicator } from "@/components/ZbtIndicator";
 
 // The watchlist and market overview both change over time; force
 // per-request rendering rather than relying on Next's static/dynamic
@@ -30,6 +31,8 @@ export default async function DashboardPage() {
           気になる銘柄を追加すると、多面的な分析結果と買い時・売り時の目安を確認できます。
         </p>
       </div>
+
+      <ZbtIndicator />
 
       <MarketOverview data={marketOverview} />
 
