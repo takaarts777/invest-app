@@ -20,10 +20,15 @@ async function hasValidSession(req: NextRequest): Promise<boolean> {
   if (!secret) return false;
 
   try {
-    await jwtVerify(cookie, new TextEncoder().encode(secret), {
+    const { payload } = await jwtVerify(cookie, new TextEncoder().encode(secret), {
       algorithms: ["HS256"],
     });
-    return true;
+    // Pre-multi-user cookies ({authenticated: true}, no userId) are still
+    // a cryptographically valid JWT under the same secret, but every page
+    // now treats "no userId" as logged-out — if this only checked the
+    // signature, that mismatch produced a redirect loop (page: no userId
+    // -> /login; proxy: valid signature -> bounce back to /).
+    return typeof payload.userId === "string";
   } catch {
     return false;
   }
