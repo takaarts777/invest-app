@@ -76,6 +76,186 @@ $CRON_SECRET` ヘッダーを付与するので、`CRON_SECRET` 環境変数を�
 動作します。頻度を変えたい場合は `vercel.json` の `schedule`（cron式）を編集してください
 （Hobbyプランはcronの実行頻度に制限があるため、頻繁に変えたい場合はProプランが必要です）。
 
+## 自分のVPSへのデプロイ（プロトタイプ・友人とのテスト運用向け）
+
+**注意**: ロリポップ・ConoHa WINGなどのPHP系共有ホスティングは、Node.jsの常駐プロセス
+（SSH経由でのポート待受・バックグラウンドプロセス実行）を許可していないため、このアプリは
+デプロイできません。代わりに月数百円〜のLinux VPSを1台契約してください。既に独自ドメインを
+お持ちなら、そのドメインのサブドメイン（例: `invest.example.com`）をVPSに向けるだけでよく、
+新規のドメイン取得は不要です。
+
+候補（Ubuntu 22.04/24.04 LTSが選べるもの。価格は目安・変動あり）:
+- ConoHa VPS（時間課金あり、最小構成 月額700円前後〜）
+- さくらのVPS（月額850円前後〜）
+- AWS Lightsail（月$3.5前後〜）
+
+### 0. サーバーの初期設定
+
+契約後に発行されたIPアドレスへSSH接続し、rootを直接使わず作業用ユーザーを作成:
+
+```bash
+ssh root@<サーバーのIPアドレス>
+adduser deploy
+usermod -aG sudo deploy
+su - deploy
+```
+
+ファイアウォールでSSH・HTTP・HTTPSのみ許可:
+
+```bash
+sudo ufw allow OpenSSH
+sudo ufw allow 80,443/tcp
+sudo ufw enable
+```
+
+### 1. Node.js・git・Nginxをインストール
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs git nginx
+node -v   # v20.x であることを確認
+```
+
+### 2. アプリをサーバーに配置
+
+このプロジェクトをGitHub等のプライベートリポジトリにpushしておき、VPS上でcloneするのが
+一番簡単です:
+
+```bash
+cd ~
+git clone https://github.com/<あなたのアカウント>/<リポジトリ名>.git investapp
+cd investapp
+```
+
+（GitHubを使わない場合は、ローカルPCから `scp -r`（`node_modules`は除く）でフォルダごと
+転送しても構いません。）
+
+### 3. 本番用の環境変数を設定
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+`SESSION_SECRET`・`ENCRYPTION_KEY`はローカルの値を使い回さず、本番用に新しく生成してください
+（下のコマンドを2回実行し、それぞれ別の値を使う）:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+| 変数 | 値 |
+| --- | --- |
+| `DATABASE_URL` | `file:./dev.db`（プロトタイプ運用ならSQLiteのままでOK） |
+| `SESSION_SECRET` | 上記コマンドで新規生成した値 |
+| `ENCRYPTION_KEY` | 上記コマンドで新規生成した値（`SESSION_SECRET`とは別の値） |
+| `FINNHUB_API_KEY` | ローカルと同じ無料キーを流用可 |
+| `CRON_SECRET` | 任意のランダム文字列 |
+
+### 4. インストール・DB作成・ビルド
+
+```bash
+npm install
+npx prisma migrate deploy
+npm run build
+```
+
+（`migrate deploy`はローカル開発用の`migrate dev`と違い、既存のマイグレーションファイルを
+そのまま適用するだけの本番向けコマンドで、対話プロンプトを出しません。）
+
+### 5. PM2で常駐プロセス化
+
+```bash
+sudo npm install -g pm2
+pm2 start npm --name investapp -- start
+pm2 save
+pm2 startup   # 表示されるコマンドをコピーして実行（サーバー再起動時の自動起動設定）
+```
+
+### 6. ドメインのDNS設定
+
+ドメインの管理画面で、サブドメイン（例: `invest.example.com`）のAレコードをVPSのIP
+アドレスに向けます。反映まで数分〜数十分かかることがあります。
+
+### 7. Nginxをリバースプロキシとして設定
+
+```bash
+sudo nano /etc/nginx/sites-available/investapp
+```
+
+```nginx
+server {
+    listen 80;
+    server_name invest.example.com;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/investapp /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### 8. HTTPS化（Let's Encrypt、無料）
+
+```bash
+sudo apt-get install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d invest.example.com
+```
+
+証明書は自動更新されます（`sudo certbot renew --dry-run` で確認可）。
+
+### 9. 動作確認
+
+`https://invest.example.com` を開くと自動的に`/setup`へ案内されるので、最初のアカウント
+（あなた自身）を作成してください。ログイン後、「ユーザー管理」ページから友人用のアカウントを
+作成し、ユーザー名・初期パスワードを伝えてください。
+
+### 10. 定期更新（任意、Vercel Cronの代わり）
+
+```bash
+sudo timedatectl set-timezone Asia/Tokyo
+crontab -e
+```
+
+```cron
+0 22 * * * curl -s -H "Authorization: Bearer <CRON_SECRETの値>" https://invest.example.com/api/cron/refresh
+```
+
+### 今後の更新方法
+
+コードを更新したら、サーバー上で:
+
+```bash
+cd ~/investapp
+git pull
+npm install
+npx prisma migrate deploy
+npm run build
+pm2 restart investapp
+```
+
+### 運用上の注意（プロトタイプ運用）
+
+- SQLiteのDBファイル（`prisma/dev.db`）はVPSのディスク上だけに存在します。壊れると全データが
+  消えるので、`cp prisma/dev.db ~/backup-$(date +%F).db` 等で定期的にバックアップを取ることを
+  おすすめします。友人が増えて本格運用する場合はPostgresへの切り替え（上のVercelデプロイ手順の
+  手順1と同じ）を検討してください。
+- 友人が数人使う程度ならFinnhub無料枠（1分60リクエスト）で十分ですが、人数が増えると制限に
+  当たる可能性があります。
+- Anthropic APIキーは各ユーザーが自分の「設定」ページで登録する方式なので、友人の分析コストを
+  あなたが負担することはありません（未設定でも他の分析機能は使えます）。
+
 ## 開発メモ
 
 - Next.js 16 を使用しており、`middleware.ts` は `src/proxy.ts` に名称変更されているなど従来と異なる点があります。詳細は [CLAUDE.md](./CLAUDE.md) を参照してください。
