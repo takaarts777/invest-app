@@ -20,6 +20,12 @@ export default function DashboardLayout({
             >
               ポートフォリオ
             </Link>
+            <Link
+              href="/users"
+              className="text-sm text-slate-400 transition hover:text-slate-100"
+            >
+              ユーザー管理
+            </Link>
           </div>
           <form action={logout}>
             <button

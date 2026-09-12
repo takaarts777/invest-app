@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createSession } from "@/lib/session";
+import { verifyLogin, InvalidCredentialsError } from "@/lib/users";
 
 export type LoginState = { error?: string } | undefined;
 
@@ -9,17 +10,22 @@ export async function login(
   _prevState: LoginState,
   formData: FormData
 ): Promise<LoginState> {
+  const username = formData.get("username");
   const password = formData.get("password");
-  const appPassword = process.env.APP_PASSWORD;
 
-  if (!appPassword) {
-    return { error: "サーバー側でAPP_PASSWORDが設定されていません。" };
+  if (typeof username !== "string" || typeof password !== "string" || !username || !password) {
+    return { error: "ユーザー名とパスワードを入力してください。" };
   }
 
-  if (typeof password !== "string" || password !== appPassword) {
-    return { error: "パスワードが違います。" };
+  try {
+    const userId = await verifyLogin(username, password);
+    await createSession(userId);
+  } catch (error) {
+    if (error instanceof InvalidCredentialsError) {
+      return { error: error.message };
+    }
+    return { error: "ログインに失敗しました。" };
   }
 
-  await createSession();
   redirect("/");
 }

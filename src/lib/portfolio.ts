@@ -56,8 +56,8 @@ const EMPTY_SUMMARY: PortfolioSummary = {
  * live; a single failed price lookup degrades that one row to "price
  * unavailable" rather than failing the whole page.
  */
-export async function getPortfolioSummary(): Promise<PortfolioSummary> {
-  const holdings = await listHoldings();
+export async function getPortfolioSummary(userId: string): Promise<PortfolioSummary> {
+  const holdings = await listHoldings(userId);
   if (holdings.length === 0) return EMPTY_SUMMARY;
 
   const [priceResults, snapshots, usdJpyRate] = await Promise.all([

@@ -1,10 +1,20 @@
-"use client";
+import { redirect } from "next/navigation";
+import { userCount } from "@/lib/users";
+import { LoginForm } from "@/components/LoginForm";
 
-import { useActionState } from "react";
-import { login } from "./actions";
+// The redirect below depends on live DB state (has anyone signed up
+// yet?); Prisma reads don't force dynamic rendering the way cookies()/
+// headers() do, so without this a build-time snapshot (typically 0
+// users) could get baked in as a static page that always redirects to
+// /setup even after accounts exist.
+export const dynamic = "force-dynamic";
 
-export default function LoginPage() {
-  const [state, formAction, pending] = useActionState(login, undefined);
+export default async function LoginPage() {
+  // No accounts exist yet — send them to create the first one instead of
+  // showing a login form that can never succeed.
+  if ((await userCount()) === 0) {
+    redirect("/setup");
+  }
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-slate-950 px-4">
@@ -13,40 +23,10 @@ export default function LoginPage() {
           投資アナリティクス
         </h1>
         <p className="mb-6 text-sm text-slate-400">
-          パスワードを入力してください
+          ユーザー名とパスワードを入力してください
         </p>
 
-        <form action={formAction} className="space-y-4">
-          <div>
-            <label htmlFor="password" className="sr-only">
-              パスワード
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoFocus
-              required
-              autoComplete="current-password"
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-sky-500"
-              placeholder="パスワード"
-            />
-          </div>
-
-          {state?.error && (
-            <p className="text-sm text-red-400" role="alert">
-              {state.error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={pending}
-            className="w-full rounded-lg bg-sky-600 px-3 py-2 font-medium text-white transition hover:bg-sky-500 disabled:opacity-50"
-          >
-            {pending ? "確認中..." : "ログイン"}
-          </button>
-        </form>
+        <LoginForm />
       </div>
     </div>
   );

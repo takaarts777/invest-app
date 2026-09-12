@@ -21,9 +21,23 @@ enum AssetType {
   CRYPTO
 }
 
-// A ticker the user is watching.
+// A login account. Each user has their own fully separate watchlist —
+// see WatchlistItem.userId. Created via /setup (only when no users exist
+// yet) or by an existing user from the /users management page.
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  watchlistItems WatchlistItem[]
+}
+
+// A ticker one user is watching.
 model WatchlistItem {
   id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Symbol as entered/displayed to the user, e.g. "AAPL", "TQQQ", "BTC".
   symbol      String
   assetType   AssetType
@@ -43,7 +57,8 @@ model WatchlistItem {
 
   snapshots AnalysisSnapshot[]
 
-  @@unique([symbol, assetType])
+  // Uniqueness is per-user now — two different users can each watch AAPL.
+  @@unique([userId, symbol, assetType])
 }
 
 // A computed analysis result for a watchlist item, cached so the dashboard

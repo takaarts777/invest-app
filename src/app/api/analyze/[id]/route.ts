@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthenticated } from "@/lib/session";
+import { getSessionUserId } from "@/lib/session";
 import { getWatchlistItem } from "@/lib/market";
 import { runFullAnalysis, snapshotDataFrom } from "@/lib/analysis/signal";
 import { prisma } from "@/lib/db";
@@ -8,12 +8,13 @@ export async function POST(
   _request: Request,
   ctx: RouteContext<"/api/analyze/[id]">
 ) {
-  if (!(await isAuthenticated())) {
+  const userId = await getSessionUserId();
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { id } = await ctx.params;
-  const item = await getWatchlistItem(id);
+  const item = await getWatchlistItem(id, userId);
   if (!item) {
     return NextResponse.json({ error: "銘柄が見つかりません。" }, { status: 404 });
   }

@@ -6,7 +6,11 @@ import { jwtVerify } from "jose";
 // It runs on every request and gates the whole app behind the /login page,
 // except /login itself and static assets.
 
-const PUBLIC_PATHS = ["/login"];
+// /setup is public too — it's the first-run "create the initial account"
+// page. It's a no-op (redirects to /login) once any User already exists;
+// that check happens in the page itself, not here, to keep this file
+// free of DB calls.
+const PUBLIC_PATHS = ["/login", "/setup"];
 
 async function hasValidSession(req: NextRequest): Promise<boolean> {
   const cookie = req.cookies.get("session")?.value;

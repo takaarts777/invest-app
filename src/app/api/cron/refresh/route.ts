@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { listWatchlist } from "@/lib/market";
+import { listAllWatchlistItemsForCron } from "@/lib/market";
 import { runFullAnalysis, snapshotDataFrom } from "@/lib/analysis/signal";
 
 // Triggered by Vercel Cron (see vercel.json) to keep every watchlist
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const items = await listWatchlist();
+  const items = await listAllWatchlistItemsForCron();
   const results: { id: string; symbol: string; ok: boolean; error?: string }[] = [];
 
   for (const item of items) {

@@ -18,7 +18,6 @@ cp .env.example .env
 
 | 変数 | 内容 | 取得方法 |
 | --- | --- | --- |
-| `APP_PASSWORD` | ログインパスワード | 任意の文字列に変更 |
 | `SESSION_SECRET` | セッションCookie署名用の秘密鍵 | `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` |
 | `FINNHUB_API_KEY` | 米国株/ETFのファンダメンタルズ分析（PER/ROE等）用 | https://finnhub.io/register で無料登録 |
 | `ANTHROPIC_API_KEY` | ニュースセンチメント判定・買い時/売り時の根拠説明生成用 | https://console.anthropic.com/ |
@@ -42,7 +41,9 @@ npx prisma migrate dev
 npm run dev
 ```
 
-http://localhost:3000 を開き、`.env` の `APP_PASSWORD` でログインしてください。
+http://localhost:3000 を開いてください。**初回はユーザーが0件のため自動的に`/setup`へ案内され、
+最初のアカウント(ユーザー名・パスワード)を作成**できます。2人目以降のユーザーは、ログイン後の
+「ユーザー管理」ページから追加できます。各ユーザーのウォッチリスト・ポートフォリオは完全に独立しています。
 
 ## 本番デプロイ（Vercel、スマホからも外出先アクセス）
 
@@ -57,7 +58,7 @@ http://localhost:3000 を開き、`.env` の `APP_PASSWORD` でログインし�
      ```
    - `DATABASE_URL` をPostgresの接続URLに差し替えて `npx prisma migrate dev` を再実行（新しいマイグレーション履歴が作られます）
 2. GitHubにpushし、[Vercel](https://vercel.com) でプロジェクトをインポート
-3. Vercelの環境変数に `.env` と同じキー（`DATABASE_URL`, `APP_PASSWORD`, `SESSION_SECRET`, `FINNHUB_API_KEY`, `ANTHROPIC_API_KEY`, `CRON_SECRET`）を設定
+3. Vercelの環境変数に `.env` と同じキー（`DATABASE_URL`, `SESSION_SECRET`, `FINNHUB_API_KEY`, `ANTHROPIC_API_KEY`, `CRON_SECRET`）を設定
 4. デプロイ後に発行されるURLへスマホ・PCどちらからでもアクセス可能
 
 ### 定期更新（Vercel Cron）

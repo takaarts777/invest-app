@@ -3,10 +3,10 @@ import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-// Single-user app: the session payload only needs to prove "this browser
-// passed the password check", not identify a specific account.
+// Multi-user app: the session identifies which User is logged in, so
+// every data query can be scoped to them.
 type SessionPayload = {
-  authenticated: true;
+  userId: string;
   expiresAt: number;
 };
 
@@ -43,9 +43,9 @@ async function decrypt(session: string | undefined) {
   }
 }
 
-export async function createSession() {
+export async function createSession(userId: string) {
   const expiresAt = Date.now() + SESSION_DURATION_MS;
-  const session = await encrypt({ authenticated: true, expiresAt });
+  const session = await encrypt({ userId, expiresAt });
   const cookieStore = await cookies();
 
   cookieStore.set(COOKIE_NAME, session, {
@@ -71,5 +71,13 @@ export async function getSession() {
 
 export async function isAuthenticated() {
   const session = await getSession();
-  return session?.authenticated === true;
+  return typeof session?.userId === "string";
+}
+
+/** The logged-in user's id, or null if there's no valid session. Every
+ *  data-access function in lib/market.ts, lib/portfolio.ts, etc. takes
+ *  this as a scoping parameter — never trust a client-supplied userId. */
+export async function getSessionUserId(): Promise<string | null> {
+  const session = await getSession();
+  return session?.userId ?? null;
 }

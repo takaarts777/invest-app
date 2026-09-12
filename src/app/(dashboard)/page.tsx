@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { listWatchlist } from "@/lib/market";
+import { getSessionUserId } from "@/lib/session";
 import { getLatestSnapshotsFor } from "@/lib/snapshots";
 import { getMarketOverview } from "@/lib/market-overview";
 import { AddTickerForm } from "@/components/AddTickerForm";
@@ -16,7 +18,10 @@ import { ZbtIndicator } from "@/components/ZbtIndicator";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const items = await listWatchlist();
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
+
+  const items = await listWatchlist(userId);
   const snapshots = await getLatestSnapshotsFor(items.map((i) => i.id));
   const marketOverview = await getMarketOverview();
   const sectorHeatmap = await getSectorHeatmap();

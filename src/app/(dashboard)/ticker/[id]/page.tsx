@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getWatchlistItem } from "@/lib/market";
+import { getSessionUserId } from "@/lib/session";
 import { getLatestSnapshot } from "@/lib/snapshots";
 import { PriceChart } from "@/components/PriceChart";
 import { AnalysisPanels } from "@/components/AnalysisPanels";
@@ -13,8 +14,11 @@ const ASSET_TYPE_LABEL: Record<string, string> = {
 };
 
 export default async function TickerPage(props: PageProps<"/ticker/[id]">) {
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
+
   const { id } = await props.params;
-  const item = await getWatchlistItem(id);
+  const item = await getWatchlistItem(id, userId);
   if (!item) notFound();
   const snapshot = await getLatestSnapshot(item.id);
 

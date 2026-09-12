@@ -1,20 +1,22 @@
 import { NextResponse } from "next/server";
-import { isAuthenticated } from "@/lib/session";
+import { getSessionUserId } from "@/lib/session";
 import { addWatchlistItem, listWatchlist } from "@/lib/market";
 import type { AssetType } from "@prisma/client";
 
 const VALID_ASSET_TYPES: AssetType[] = ["US_STOCK", "LEVERAGED_ETF", "CRYPTO"];
 
 export async function GET() {
-  if (!(await isAuthenticated())) {
+  const userId = await getSessionUserId();
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const items = await listWatchlist();
+  const items = await listWatchlist(userId);
   return NextResponse.json({ items });
 }
 
 export async function POST(request: Request) {
-  if (!(await isAuthenticated())) {
+  const userId = await getSessionUserId();
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -35,7 +37,7 @@ export async function POST(request: Request) {
 
   try {
     const hint = providerId && displayName ? { providerId, displayName } : undefined;
-    const item = await addWatchlistItem(symbol, assetType, hint);
+    const item = await addWatchlistItem(userId, symbol, assetType, hint);
     return NextResponse.json({ item }, { status: 201 });
   } catch (error) {
     if (

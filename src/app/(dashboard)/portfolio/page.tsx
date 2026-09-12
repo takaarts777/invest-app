@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getPortfolioSummary } from "@/lib/portfolio";
+import { getSessionUserId } from "@/lib/session";
 import { AllocationChart } from "@/components/AllocationChart";
 import { LABEL_BADGE_COLOR } from "@/lib/signal-badge";
 
@@ -53,7 +55,10 @@ function GainText({
 }
 
 export default async function PortfolioPage() {
-  const portfolio = await getPortfolioSummary();
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
+
+  const portfolio = await getPortfolioSummary(userId);
 
   return (
     <div className="space-y-6">
