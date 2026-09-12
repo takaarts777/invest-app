@@ -74,6 +74,39 @@ $CRON_SECRET` ヘッダーを付与するので、`CRON_SECRET` 環境変数を�
 動作します。頻度を変えたい場合は `vercel.json` の `schedule`（cron式）を編集してください
 （Hobbyプランはcronの実行頻度に制限があるため、頻繁に変えたい場合はProプランが必要です）。
 
+### アプリのアップデート方法（開発 → 本番反映の流れ）
+
+VercelはGitHubリポジトリと連携しているので、**`main`ブランチにpushするだけで自動的に
+再ビルド・再デプロイ**されます。手動でVercelを操作する必要はありません。
+
+1. ローカルでコードを変更する
+2. `npm run dev` で `http://localhost:3000` を開いて動作確認する
+   （このとき使われるのは`.env`の`DATABASE_URL`＝本番と同じNeonのDBなので、確認用に自分の
+   アカウントで軽く操作する程度にし、本番の友人データを壊すような大きな変更は避ける）
+3. 問題なければコミットしてpush:
+   ```bash
+   git add -A
+   git commit -m "変更内容の説明"
+   git push
+   ```
+4. Vercelが自動でビルドを開始します（Vercelダッシュボードの「Deployments」タブで進捗確認可能）。
+   数十秒〜数分で本番URLに反映されます
+
+**データベースの構造を変更した場合**（`prisma/schema.prisma`を編集した場合）は、pushする前に
+ローカルで以下を実行してマイグレーションファイルを作成してください:
+
+```bash
+npx prisma migrate dev --name 変更内容が分かる名前
+```
+
+これによって`prisma/migrations/`配下に新しいSQLファイルが作られます。これを他のコード変更と
+一緒にコミット・pushすれば、Vercel側のビルド時に自動で本番DBへ適用されます
+（`package.json`の`vercel-build`スクリプトが`prisma migrate deploy`を実行してからビルドする
+設定になっているため、Vercelの画面上で手動操作する必要はありません）。
+
+もしVercel上のビルドが失敗した場合は、ダッシュボードの「Deployments」→失敗したデプロイ→
+「Build Logs」でエラー内容を確認できます。
+
 ## 自分のVPSへのデプロイ（プロトタイプ・友人とのテスト運用向け）
 
 **注意**: ロリポップ・ConoHa WINGなどのPHP系共有ホスティングは、Node.jsの常駐プロセス
