@@ -21,6 +21,23 @@ function last<T>(arr: T[]): T | null {
   return arr.length ? arr[arr.length - 1] : null;
 }
 
+export type RsiPoint = { date: string; value: number };
+
+/**
+ * Full RSI(period) time series aligned back onto bar dates, for charting
+ * (as opposed to analyzeTechnical's single latest-value read used for
+ * scoring). RSI.calculate() drops the first `period` bars it needs to
+ * seed the average gain/loss, so rsi[i] lines up with bars[period + i].
+ */
+export function calculateRsiSeries(bars: DailyBar[], period = 14): RsiPoint[] {
+  if (bars.length <= period) return [];
+
+  const closes = bars.map((b) => b.close);
+  const values = RSI.calculate({ period, values: closes });
+
+  return values.map((value, i) => ({ date: bars[period + i].date, value }));
+}
+
 /**
  * Rule-based technical read: trend (price vs SMA50/200, golden/death
  * cross), momentum (RSI, MACD histogram), and mean-reversion (Bollinger

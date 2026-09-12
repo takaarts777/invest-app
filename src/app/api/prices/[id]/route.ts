@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUserId } from "@/lib/session";
 import { getWatchlistItem, fetchPriceDataFor } from "@/lib/market";
+import { calculateRsiSeries } from "@/lib/analysis/technical";
 
 export async function GET(
   _request: Request,
@@ -19,7 +20,8 @@ export async function GET(
 
   try {
     const { history, quote } = await fetchPriceDataFor(item);
-    return NextResponse.json({ history, quote });
+    const rsi = calculateRsiSeries(history, 14);
+    return NextResponse.json({ history, quote, rsi });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "価格データの取得に失敗しました。";

@@ -4,6 +4,7 @@ import { getWatchlistItem } from "@/lib/market";
 import { getSessionUserId } from "@/lib/session";
 import { getLatestSnapshot } from "@/lib/snapshots";
 import { PriceChart } from "@/components/PriceChart";
+import { RsiChart } from "@/components/RsiChart";
 import { AnalysisPanels } from "@/components/AnalysisPanels";
 import { HoldingForm } from "@/components/HoldingForm";
 
@@ -42,6 +43,8 @@ export default async function TickerPage(props: PageProps<"/ticker/[id]">) {
       </div>
 
       <PriceChart watchlistItemId={item.id} />
+
+      <RsiChart watchlistItemId={item.id} />
 
       <AnalysisPanels watchlistItemId={item.id} initialSnapshot={snapshot} />
 
