@@ -18,6 +18,17 @@
 
 export type MacroEventType = "FOMC" | "CPI" | "NFP";
 
+// Query used to look up related Japanese-language news for each event
+// type (lib/macro-news.ts) — one generic query per type rather than per
+// date, since Google News ranks by recency/relevance anyway and the most
+// recent coverage for e.g. "FOMC 政策金利" is naturally about whichever
+// meeting is next.
+export const MACRO_EVENT_NEWS_QUERY: Record<MacroEventType, string> = {
+  FOMC: "FOMC 政策金利",
+  CPI: "米 CPI 消費者物価指数",
+  NFP: "米 雇用統計",
+};
+
 export type MacroEvent = {
   date: string; // YYYY-MM-DD
   type: MacroEventType;

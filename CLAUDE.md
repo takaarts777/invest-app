@@ -21,6 +21,7 @@
   - CoinGecko（無料・キー不要）: 暗号資産の価格・日足ヒストリカル（`/coins/{id}/ohlc`）・ファンダメンタルズ相当データ（`/coins/{id}` — 時価総額ランク・ATHからの乖離・供給量等）
   - Finnhub（`FINNHUB_API_KEY`必須）: 株/ETFのファンダメンタルズ（`/stock/metric?metric=all` — PER/PBR/ROE/売上成長率等）。企業ニュース取得用の`fetchCompanyNews`も実装済みだが現状はYahoo検索で代替しており未使用。
   - Anthropic Claude（`claude-sonnet-5`）: ニュース見出しからのセンチメントスコア算出、4軸分析結果を根拠にした買い時/売り時の説明文生成。**アプリ全体で共有するAPIキーは存在しない**——各ユーザーが`/settings`ページで自分のAnthropic APIキーを登録し（`User.anthropicApiKeyEncrypted`にAES-256-GCM暗号化して保存、`lib/crypto.ts`）、そのユーザーの分析実行時だけ`lib/users.ts`の`getAnthropicApiKey(userId)`で復号して使う。これはオーナー1人が全ユーザー分のClaude利用料を負担しないための設計。キー未設定時は例外を投げず「未設定」を示すメッセージにフォールバックする。
+  - Google News RSS（無料・キー不要、`hl=ja&gl=JP&ceid=JP:ja`）: 経済指標カレンダーの各イベント（FOMC/CPI/NFP）に紐づく日本語ニュースの見出し・リンク取得（`lib/providers/googlenews.ts`）。Yahoo Financeのニュース検索はほぼ英語記事しか返らないため、日本語記事が必要なこの用途だけ別プロバイダを使っている。Googleの著作権表示上は個人利用のフィードリーダー向け想定なので、他の非公式API同様「個人用アプリの範囲での利用」と割り切って使用。
 - Anthropic SDK（Claude — センチメント判定・シグナル根拠説明。フェーズ5以降で使用）
 
 ## Next.js 16 の注意点（従来バージョンと異なる点）
@@ -103,12 +104,13 @@ src/
     signal-badge.ts            # 総合判定ラベルの色分けマップ（複数コンポーネントで共有）
     snapshots.ts                # AnalysisSnapshotの取得ヘルパー
     market-overview.ts           # ダッシュボードの市場全体参考指標（Fear&Greed等）
+    macro-news.ts                  # 経済指標カレンダーの各イベントに紐づく日本語ニュースリンク（Google News RSS、タイプ毎キャッシュ）
     sector-heatmap.ts              # セクターETF11本の値動きヒートマップ
     rate-predictor.ts                # 2年債利回り vs 短期金利
     zbt.ts                             # ZBT指標の計算
     data/                                # 静的な参照データ（セクターETF、S&P500近似ユニバース等）
     providers/                            # 外部API個別クライアント（yahoo/coingecko/finnhub/
-                                           # cnnfeargreed/feargreed/forex）
+                                           # cnnfeargreed/feargreed/forex/googlenews）
     analysis/                             # 分析ロジック本体
       technical.ts                         # テクニカル指標（SMA/EMA/RSI/MACD/BB）→ -1..1スコア
       fundamental.ts                        # PER/ROE等（株/ETF）、時価総額ランク等（暗号資産）→ スコア

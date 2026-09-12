@@ -3,6 +3,7 @@ import { listWatchlist } from "@/lib/market";
 import { getSessionUserId } from "@/lib/session";
 import { getLatestSnapshotsFor } from "@/lib/snapshots";
 import { getMarketOverview } from "@/lib/market-overview";
+import { getUpcomingMacroEventsWithNews } from "@/lib/macro-news";
 import { AddTickerForm } from "@/components/AddTickerForm";
 import { WatchlistCard } from "@/components/WatchlistCard";
 import { MacroCalendar } from "@/components/MacroCalendar";
@@ -25,6 +26,7 @@ export default async function DashboardPage() {
   const snapshots = await getLatestSnapshotsFor(items.map((i) => i.id));
   const marketOverview = await getMarketOverview();
   const sectorHeatmap = await getSectorHeatmap();
+  const macroEvents = await getUpcomingMacroEventsWithNews(6);
 
   return (
     <div className="space-y-6">
@@ -43,7 +45,7 @@ export default async function DashboardPage() {
 
       <RatePredictor />
 
-      <MacroCalendar />
+      <MacroCalendar events={macroEvents} />
 
       <AddTickerForm />
 

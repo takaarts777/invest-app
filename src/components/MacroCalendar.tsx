@@ -1,4 +1,5 @@
-import { getUpcomingMacroEvents, type MacroEventType } from "@/lib/data/macro-events";
+import type { MacroEventType } from "@/lib/data/macro-events";
+import type { MacroEventWithNews } from "@/lib/macro-news";
 
 const TYPE_BADGE: Record<MacroEventType, string> = {
   FOMC: "bg-violet-500/15 text-violet-300",
@@ -36,9 +37,9 @@ function daysUntilLabel(days: number): string {
 
 /** Market-wide macro event calendar (FOMC / CPI / US jobs report) — not
  *  tied to any one ticker, so it's shown once on the dashboard rather
- *  than per-ticker. */
-export function MacroCalendar() {
-  const events = getUpcomingMacroEvents(6);
+ *  than per-ticker. `events` is pre-fetched server-side (lib/macro-news.ts),
+ *  each carrying up to 2 related Japanese-language news links. */
+export function MacroCalendar({ events }: { events: MacroEventWithNews[] }) {
   if (events.length === 0) return null;
 
   return (
@@ -46,26 +47,44 @@ export function MacroCalendar() {
       <h2 className="mb-2 text-sm font-semibold text-slate-200">
         経済指標カレンダー
       </h2>
-      <ul className="space-y-2">
+      <ul className="space-y-3">
         {events.map((e) => {
           const days = daysUntil(e.date);
           return (
-            <li
-              key={`${e.type}-${e.date}`}
-              className="flex items-center justify-between gap-3 text-sm"
-            >
-              <div className="flex min-w-0 items-center gap-2">
-                <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${TYPE_BADGE[e.type]}`}
-                >
-                  {e.type}
-                </span>
-                <span className="truncate text-slate-300">{e.title}</span>
+            <li key={`${e.type}-${e.date}`} className="text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${TYPE_BADGE[e.type]}`}
+                  >
+                    {e.type}
+                  </span>
+                  <span className="truncate text-slate-300">{e.title}</span>
+                </div>
+                <div className="shrink-0 text-right text-xs text-slate-500">
+                  <div>{formatDate(e.date)}</div>
+                  <div>{daysUntilLabel(days)}</div>
+                </div>
               </div>
-              <div className="shrink-0 text-right text-xs text-slate-500">
-                <div>{formatDate(e.date)}</div>
-                <div>{daysUntilLabel(days)}</div>
-              </div>
+
+              {e.news.length > 0 && (
+                <ul className="mt-1 space-y-0.5 pl-1">
+                  {e.news.map((n) => (
+                    <li key={n.link} className="truncate text-xs">
+                      <a
+                        href={n.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sky-400 hover:text-sky-300 hover:underline"
+                        title={n.title}
+                      >
+                        {n.title}
+                      </a>
+                      {n.source && <span className="ml-1 text-slate-600">({n.source})</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           );
         })}
