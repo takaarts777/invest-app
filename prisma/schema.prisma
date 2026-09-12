@@ -1,18 +1,20 @@
 // Prisma schema for the investment analytics app.
 //
-// NOTE: Using SQLite for local development to get a working app running
-// without requiring a cloud database up front. Before deploying to Vercel,
-// switch the datasource below to `provider = "postgresql"` and point
-// DATABASE_URL at a hosted Postgres instance (e.g. Neon, Vercel Postgres),
-// then run `npx prisma migrate dev` again. See README.md for the exact steps.
+// Using Postgres (Neon) so this can run on Vercel, whose filesystem
+// isn't persistent (SQLite would lose its data between deploys/cold
+// starts). `url` should be Neon's pooled connection string (used at
+// runtime, including by Vercel's serverless functions); `directUrl`
+// should be the non-pooled one (used only by `prisma migrate`, which
+// needs a direct connection rather than one going through PgBouncer).
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum AssetType {

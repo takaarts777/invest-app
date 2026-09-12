@@ -13,7 +13,9 @@
 - Next.js 16 (App Router, TypeScript) — フロント + API Routes (Route Handlers)
 - Tailwind CSS v4
 - Prisma **6.19.3** ORM（**7.x以降のRC/新CLIは使わないこと** — `datasource.url` 廃止やdriver adapter必須化など破壊的変更があり不安定。`package.json`でバージョン固定済み）
-- SQLite（ローカル開発用。本番/Vercelデプロイ時は `prisma/schema.prisma` の datasource を `postgresql` に切り替え、Neon等のURLを`DATABASE_URL`に設定する）
+- Postgres（Neon）— ローカル開発・本番共通。Vercelのファイルシステムは永続化されないためSQLiteは使わない。
+  `DATABASE_URL`はNeonのプールあり接続文字列（実行時用）、`DIRECT_URL`はプールなし接続文字列
+  （`prisma migrate`専用、PgBouncer経由だとマイグレーションが失敗しうるため）
 - lightweight-charts v5（価格チャート。`chart.addSeries(CandlestickSeries, options)` のv5 API）
 - jose（セッションCookieのJWT署名/検証）
 - 外部データ:
@@ -127,11 +129,12 @@ prisma/
 
 ## セットアップ
 
-1. `.env.example` を `.env` にコピーし、値を設定（`SESSION_SECRET`/`ENCRYPTION_KEY`は乱数生成、
-   `FINNHUB_API_KEY`は無料登録して取得。`APP_PASSWORD`はマルチユーザー化に伴い廃止済みで不要。
+1. `.env.example` を `.env` にコピーし、値を設定（`DATABASE_URL`/`DIRECT_URL`はNeon等のPostgres、
+   `SESSION_SECRET`/`ENCRYPTION_KEY`は乱数生成、`FINNHUB_API_KEY`は無料登録して取得。
+   `APP_PASSWORD`はマルチユーザー化に伴い廃止済みで不要。
    `ANTHROPIC_API_KEY`という環境変数は存在しない——各ユーザーがログイン後`/settings`で個別に設定する）
 2. `npm install`
-3. `npx prisma migrate dev` — ローカルSQLite DBを作成
+3. `npx prisma migrate dev` — Postgres DBにスキーマを反映
 4. `npm run dev` — http://localhost:3000 を開くと、ユーザーが0件なら自動で`/setup`に案内される
    （初回アカウント作成後は通常のログイン画面。2人目以降は`/users`から追加。AIによる要約・根拠
    説明を使いたい各ユーザーは`/settings`で自分のAnthropic APIキーを登録する）
@@ -154,7 +157,11 @@ prisma/
 - [x] フェーズ11: AnthropicのAPIキーをユーザーごとに個別管理する方式に変更（`/settings`、
   `User.anthropicApiKeyEncrypted`をAES-256-GCM暗号化保存）。アプリ全体で共有するキーを廃止し、
   分析実行時のClaude利用料は実行したユーザー自身のAnthropicアカウントに請求されるようにした
+- [x] フェーズ12: DBをSQLiteからPostgres(Neon)へ移行（`schema.prisma`の`datasource`を
+  `url`(プールあり)/`directUrl`(プールなし、`prisma migrate`専用)構成に変更。ローカル開発も
+  Vercelデプロイ用のNeon DBを共有する前提に統一し、旧SQLite用マイグレーション履歴は削除して
+  作り直した）。友人とのプロトタイプ運用のためVercel(Hobbyプラン)+GitHubでのデプロイに着手
 
 全フェーズの土台は完成。残っているのはユーザー側の作業（Finnhubの共有APIキー取得、各ユーザーが
-`/settings`から自分のAnthropic APIキーを登録、Postgresへの切り替え、Vercelへの実デプロイ）と、
+`/settings`から自分のAnthropic APIキーを登録、Vercelへの実デプロイ）と、
 実運用しながらのスコアリング重み・閾値のチューニング。

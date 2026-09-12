@@ -14,14 +14,20 @@
 cp .env.example .env
 ```
 
-`.env` を開いて以下を設定してください（`DATABASE_URL` はSQLiteなのでそのままでOK）:
+`.env` を開いて以下を設定してください:
 
 | 変数 | 内容 | 取得方法 |
 | --- | --- | --- |
+| `DATABASE_URL` | Postgresの接続URL（プールあり） | [Neon](https://neon.tech)（無料枠）等でプロジェクト作成後、ダッシュボードの接続文字列（`-pooler`付き）をコピー |
+| `DIRECT_URL` | Postgresの接続URL（プールなし、`prisma migrate`専用） | 同じダッシュボードの接続文字列から`-pooler`を外したもの |
 | `SESSION_SECRET` | セッションCookie署名用の秘密鍵 | `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` |
 | `ENCRYPTION_KEY` | 各ユーザーのAnthropic APIキーをDBに暗号化保存するための鍵 | `SESSION_SECRET`と同じコマンドで生成 |
 | `FINNHUB_API_KEY` | 米国株/ETFのファンダメンタルズ分析（PER/ROE等）用 | https://finnhub.io/register で無料登録 |
 | `CRON_SECRET` | Vercel Cronからの定期再分析リクエストを認証する秘密鍵 | 任意の文字列（ローカルではそのままでOK） |
+
+※ Vercelのファイルシステムは永続化されないため、ローカル開発も含めて最初からPostgresを使う
+構成にしています（SQLiteは使いません）。ローカル用とVercel用で同じNeon DBを共有しても、
+別々に用意してもどちらでも構いません（プロトタイプ運用なら同じもので十分です）。
 
 ※ ウォッチリストへの銘柄追加・価格チャート表示・暗号資産のファンダメンタルズ分析は
 `FINNHUB_API_KEY`なしでも動きます（Yahoo Finance非公式APIとCoinGeckoはキー不要）。
@@ -53,20 +59,12 @@ http://localhost:3000 を開いてください。**初回はユーザーが0件�
 
 ## 本番デプロイ（Vercel、スマホからも外出先アクセス）
 
-1. **DBをPostgresに切り替える**（Vercelのファイルシステムは永続化されないためSQLiteは使えません）
-   - [Neon](https://neon.tech)（無料枠あり）などでPostgresデータベースを作成し、接続URLを控える
-   - `prisma/schema.prisma` の `datasource db` を以下に変更:
-     ```prisma
-     datasource db {
-       provider = "postgresql"
-       url      = env("DATABASE_URL")
-     }
-     ```
-   - `DATABASE_URL` をPostgresの接続URLに差し替えて `npx prisma migrate dev` を再実行（新しいマイグレーション履歴が作られます）
-2. GitHubにpushし、[Vercel](https://vercel.com) でプロジェクトをインポート
-3. Vercelの環境変数に `.env` と同じキー（`DATABASE_URL`, `SESSION_SECRET`, `ENCRYPTION_KEY`, `FINNHUB_API_KEY`, `CRON_SECRET`）を設定
+上のセットアップですでにPostgres（Neon）を使っているので、DBの切り替え作業は不要です。
+
+1. GitHubにpushし、[Vercel](https://vercel.com) でプロジェクトをインポート
+2. Vercelの環境変数に `.env` と同じキー（`DATABASE_URL`, `DIRECT_URL`, `SESSION_SECRET`, `ENCRYPTION_KEY`, `FINNHUB_API_KEY`, `CRON_SECRET`）を設定
    （`ANTHROPIC_API_KEY`は不要——各ユーザーがログイン後の「設定」ページで自分のキーを登録します）
-4. デプロイ後に発行されるURLへスマホ・PCどちらからでもアクセス可能
+3. デプロイ後に発行されるURLへスマホ・PCどちらからでもアクセス可能
 
 ### 定期更新（Vercel Cron）
 
@@ -146,7 +144,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 | 変数 | 値 |
 | --- | --- |
-| `DATABASE_URL` | `file:./dev.db`（プロトタイプ運用ならSQLiteのままでOK） |
+| `DATABASE_URL` | ローカル/Vercelと同じNeonの接続URL（プールあり）を流用可 |
+| `DIRECT_URL` | 同上（プールなし） |
 | `SESSION_SECRET` | 上記コマンドで新規生成した値 |
 | `ENCRYPTION_KEY` | 上記コマンドで新規生成した値（`SESSION_SECRET`とは別の値） |
 | `FINNHUB_API_KEY` | ローカルと同じ無料キーを流用可 |
@@ -247,10 +246,9 @@ pm2 restart investapp
 
 ### 運用上の注意（プロトタイプ運用）
 
-- SQLiteのDBファイル（`prisma/dev.db`）はVPSのディスク上だけに存在します。壊れると全データが
-  消えるので、`cp prisma/dev.db ~/backup-$(date +%F).db` 等で定期的にバックアップを取ることを
-  おすすめします。友人が増えて本格運用する場合はPostgresへの切り替え（上のVercelデプロイ手順の
-  手順1と同じ）を検討してください。
+- データはVPSのディスクではなくNeon（Postgres）側に保存されるので、VPSを作り直してもデータは
+  消えません。Neonの無料枠にも一応バックアップ機能はありますが、本格運用する場合は有料プランの
+  Point-in-time restore等も検討してください。
 - 友人が数人使う程度ならFinnhub無料枠（1分60リクエスト）で十分ですが、人数が増えると制限に
   当たる可能性があります。
 - Anthropic APIキーは各ユーザーが自分の「設定」ページで登録する方式なので、友人の分析コストを
