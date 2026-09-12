@@ -30,7 +30,57 @@ model User {
   passwordHash String
   createdAt    DateTime @default(now())
 
-  watchlistItems WatchlistItem[]
+  watchlistItems   WatchlistItem[]
+  simulatorAccount SimulatorAccount?
+}
+
+// One paper-trading account per user, seeded with a fixed starting
+// balance. cashJpy is the only mutable field here — everything else
+// (holdings, history) lives in the related models.
+model SimulatorAccount {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cashJpy   Float    @default(500000)
+  createdAt DateTime @default(now())
+
+  positions SimulatorPosition[]
+  trades    SimulatorTrade[]
+}
+
+// A current paper-trading position (quantity + running average cost).
+// Deleted once quantity reaches 0 via a sell.
+model SimulatorPosition {
+  id          String           @id @default(cuid())
+  accountId   String
+  account     SimulatorAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  symbol      String
+  assetType   AssetType
+  providerId  String
+  displayName String?
+  quantity    Float
+  avgCostJpy  Float // average cost per unit, in JPY
+
+  @@unique([accountId, symbol, assetType])
+}
+
+// An immutable log entry for one simulated buy or sell, so trade history
+// and realized P&L can be shown even after a position is fully closed.
+model SimulatorTrade {
+  id               String           @id @default(cuid())
+  accountId        String
+  account          SimulatorAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  symbol           String
+  assetType        AssetType
+  side             String // "BUY" | "SELL"
+  quantity         Float
+  priceUsd         Float // execution price per unit, USD
+  usdJpyRate       Float // rate used to convert this trade to JPY
+  amountJpy        Float // total JPY value of this trade (quantity * priceUsd * usdJpyRate)
+  realizedPnlJpy   Float? // set only for SELL trades
+  executedAt       DateTime @default(now())
+
+  @@index([accountId, executedAt])
 }
 
 // A ticker one user is watching.

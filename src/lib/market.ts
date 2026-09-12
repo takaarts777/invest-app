@@ -20,9 +20,10 @@ export class NotFoundError extends Error {
   }
 }
 
-/** Resolves the provider-specific lookup id and a display name for a new
- *  watchlist entry, without writing to the database. */
-async function resolveSymbol(
+/** Resolves the provider-specific lookup id and a display name for a
+ *  symbol, without writing to the database. Shared by addWatchlistItem
+ *  and the simulator's buy flow. */
+export async function resolveSymbol(
   symbol: string,
   assetType: AssetType
 ): Promise<{ providerId: string; displayName: string }> {
@@ -127,7 +128,9 @@ export type PriceData = {
   history: DailyBar[];
 };
 
-export async function fetchPriceDataFor(item: WatchlistItem): Promise<PriceData> {
+export async function fetchPriceDataFor(
+  item: Pick<WatchlistItem, "assetType" | "providerId">
+): Promise<PriceData> {
   if (item.assetType === "CRYPTO") {
     const [history, price] = await Promise.all([
       coingecko.fetchDailyHistory(item.providerId),

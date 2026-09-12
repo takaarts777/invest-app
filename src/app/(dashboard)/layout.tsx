@@ -21,6 +21,12 @@ export default function DashboardLayout({
               ポートフォリオ
             </Link>
             <Link
+              href="/simulator"
+              className="text-sm text-slate-400 transition hover:text-slate-100"
+            >
+              シミュレーター
+            </Link>
+            <Link
               href="/users"
               className="text-sm text-slate-400 transition hover:text-slate-100"
             >

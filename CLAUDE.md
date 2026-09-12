@@ -59,6 +59,7 @@ src/
       page.tsx           # ダッシュボード（ZBT/市場概況/金利予測/経済指標カレンダー/
                           # セクターヒートマップ + 自分のウォッチリスト）
       portfolio/          # 保有中の銘柄の評価額・含み損益・アロケーション
+      simulator/           # 疑似売買シミュレーター（元手¥500,000、実際の資産は動かない）
       ticker/[id]/         # 銘柄詳細（チャート + 4軸分析パネル + 保有情報フォーム）
       users/                # ユーザー管理（追加・削除、UserManagement.tsx）
     api/
@@ -71,6 +72,9 @@ src/
       users/[id]/            # ユーザー削除（自分自身は削除不可）
       rate-predictor/         # 2年債利回り vs 短期金利
       zbt/                     # ZBT(Zweig Breadth Thrust)指標
+      simulator/                # 口座サマリー取得（GET）
+      simulator/trade/            # 疑似売買の実行（POST、買い/売り）
+      simulator/reset/              # 口座を元手¥500,000にリセット（POST）
       cron/refresh/             # Vercel Cronからの定期一括再分析（CRON_SECRET必須、全ユーザー対象）
   lib/
     db.ts               # Prisma Client シングルトン
@@ -79,6 +83,9 @@ src/
     actions.ts             # 共通Server Actions（ログアウト等）
     market.ts               # ウォッチリストCRUD + 価格取得の統合ロジック（全関数userIdスコープ必須）
     portfolio.ts              # 保有銘柄の評価額・含み損益・アロケーション集計
+    simulator.ts               # 疑似売買（買い/売り/リセット）、加重平均取得単価の計算（"server-only"）
+    simulator-constants.ts      # STARTING_CASH_JPY（¥500,000）。simulator.tsから分離し、
+                                 # クライアントコンポーネントがserver-onlyな依存を巻き込まず参照できるようにしている
     signal-badge.ts            # 総合判定ラベルの色分けマップ（複数コンポーネントで共有）
     snapshots.ts                # AnalysisSnapshotの取得ヘルパー
     market-overview.ts           # ダッシュボードの市場全体参考指標（Fear&Greed等）
@@ -98,7 +105,8 @@ src/
       signal.ts                                # 5軸を重み付け合成 + Claudeで根拠説明文を生成
   components/            # UIコンポーネント（AnalysisPanelsが分析結果の表示を担当）
 prisma/
-  schema.prisma          # User, WatchlistItem, AnalysisSnapshot
+  schema.prisma          # User, WatchlistItem, AnalysisSnapshot,
+                          # SimulatorAccount/SimulatorPosition/SimulatorTrade
 ```
 
 ## セットアップ
@@ -122,6 +130,8 @@ prisma/
 
 - [x] フェーズ8: マルチユーザー化（`User`モデル、`/setup`初回登録、`/users`管理画面、
   全データアクセス関数のuserIdスコープ化）— 単一パスワード方式から移行済み
+- [x] フェーズ9: 投資シミュレーター（`/simulator`。ユーザーごとに元手¥500,000の疑似口座を
+  1つ持ち、実際の現在値×都度取得のUSD/JPYレートで疑似売買。加重平均取得単価で確定損益/含み損益を分離)
 
 全フェーズの土台は完成。残っているのはユーザー側の作業（Finnhub/AnthropicのAPIキー取得、
 Postgresへの切り替え、Vercelへの実デプロイ）と、実運用しながらのスコアリング重み・
