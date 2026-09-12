@@ -32,6 +32,12 @@ export default function DashboardLayout({
             >
               ユーザー管理
             </Link>
+            <Link
+              href="/settings"
+              className="text-sm text-slate-400 transition hover:text-slate-100"
+            >
+              設定
+            </Link>
           </div>
           <form action={logout}>
             <button

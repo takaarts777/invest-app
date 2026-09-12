@@ -2,6 +2,7 @@ import "server-only";
 
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
+import { encryptSecret, decryptSecret } from "@/lib/crypto";
 
 const SALT_ROUNDS = 12;
 
@@ -70,4 +71,42 @@ export async function verifyLogin(username: string, password: string): Promise<s
  *  DELETE /api/users/[id]. */
 export function deleteUser(id: string) {
   return prisma.user.delete({ where: { id } });
+}
+
+/** Whether this user has their own Anthropic API key on file — never
+ *  exposes the key itself to callers/clients, just the boolean. */
+export async function hasAnthropicApiKey(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { anthropicApiKeyEncrypted: true },
+  });
+  return Boolean(user?.anthropicApiKeyEncrypted);
+}
+
+/** Decrypts and returns this user's own Anthropic API key, or null if
+ *  they haven't set one. This is the only place the plaintext key should
+ *  ever exist outside the request that set it — pass it straight into
+ *  the Anthropic client, never log it or send it back to the browser. */
+export async function getAnthropicApiKey(userId: string): Promise<string | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { anthropicApiKeyEncrypted: true },
+  });
+  if (!user?.anthropicApiKeyEncrypted) return null;
+  try {
+    return decryptSecret(user.anthropicApiKeyEncrypted);
+  } catch {
+    // Ciphertext from a since-rotated ENCRYPTION_KEY, or corrupted data —
+    // treat it the same as "not set" rather than failing the analysis.
+    return null;
+  }
+}
+
+/** Sets (or, with `null`, clears) this user's own Anthropic API key. */
+export async function setAnthropicApiKey(userId: string, apiKey: string | null): Promise<void> {
+  const trimmed = apiKey?.trim() || null;
+  await prisma.user.update({
+    where: { id: userId },
+    data: { anthropicApiKeyEncrypted: trimmed ? encryptSecret(trimmed) : null },
+  });
 }

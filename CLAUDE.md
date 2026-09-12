@@ -20,7 +20,7 @@
   - Yahoo Finance非公式API（無料・キー不要）: `/v8/finance/chart/` で米国株/ETFの現在値・日足ヒストリカル・銘柄名、`/v1/finance/search` でニュース見出し（株/ETF/暗号資産共通。暗号資産はティッカーでなく`displayName`で検索する方が精度が良い）。`/v10/finance/quoteSummary`は401で使用不可（crumb認証が必要になったため不採用）。Stooqはボット判定JSチャレンジを返すため不採用。
   - CoinGecko（無料・キー不要）: 暗号資産の価格・日足ヒストリカル（`/coins/{id}/ohlc`）・ファンダメンタルズ相当データ（`/coins/{id}` — 時価総額ランク・ATHからの乖離・供給量等）
   - Finnhub（`FINNHUB_API_KEY`必須）: 株/ETFのファンダメンタルズ（`/stock/metric?metric=all` — PER/PBR/ROE/売上成長率等）。企業ニュース取得用の`fetchCompanyNews`も実装済みだが現状はYahoo検索で代替しており未使用。
-  - Anthropic Claude（`ANTHROPIC_API_KEY`必須、`claude-sonnet-5`）: ニュース見出しからのセンチメントスコア算出、4軸分析結果を根拠にした買い時/売り時の説明文生成。どちらもキー未設定時は例外を投げず「未設定」を示すエラー/メッセージにフォールバックする。
+  - Anthropic Claude（`claude-sonnet-5`）: ニュース見出しからのセンチメントスコア算出、4軸分析結果を根拠にした買い時/売り時の説明文生成。**アプリ全体で共有するAPIキーは存在しない**——各ユーザーが`/settings`ページで自分のAnthropic APIキーを登録し（`User.anthropicApiKeyEncrypted`にAES-256-GCM暗号化して保存、`lib/crypto.ts`）、そのユーザーの分析実行時だけ`lib/users.ts`の`getAnthropicApiKey(userId)`で復号して使う。これはオーナー1人が全ユーザー分のClaude利用料を負担しないための設計。キー未設定時は例外を投げず「未設定」を示すメッセージにフォールバックする。
 - Anthropic SDK（Claude — センチメント判定・シグナル根拠説明。フェーズ5以降で使用）
 
 ## Next.js 16 の注意点（従来バージョンと異なる点）
@@ -48,6 +48,17 @@
 - `listAllWatchlistItemsForCron()`だけは全ユーザー分を返す例外（Vercel Cronの一括再分析専用、`CRON_SECRET`で保護）。
   リクエストスコープのハンドラから絶対に呼ばないこと
 
+### Anthropic APIキー（ユーザーごと・アプリ共有キーなし）
+
+`runFullAnalysis(item, anthropicApiKey)`（`lib/analysis/signal.ts`）は第2引数に呼び出し元ユーザー
+自身のAnthropic APIキー（`lib/users.ts`の`getAnthropicApiKey(userId)`で復号）を必ず渡すこと。
+`process.env.ANTHROPIC_API_KEY`は参照しない（アプリ全体で共有するキーは意図的に存在しない）。
+- `/api/analyze/[id]`: リクエストの`userId`のキーを使う
+- `/api/cron/refresh`: 全ユーザー分を一括処理するため、`WatchlistItem.userId`ごとに個別のキーを引く
+  （`apiKeyCache`でユーザーごとに1回だけ復号）
+- キー未設定のユーザーは例外にせず、`sentiment.ts`/`signal.ts`側で「未設定」の案内文にフォールバックする
+  （他の4/5軸の分析は普通に動く）
+
 ## ディレクトリ構成
 
 ```
@@ -60,12 +71,13 @@ src/
                           # セクターヒートマップ + 自分のウォッチリスト）
       portfolio/          # 保有中の銘柄の評価額・含み損益・アロケーション
       simulator/           # 疑似売買シミュレーター（元手¥500,000、実際の資産は動かない）
-      ticker/[id]/         # 銘柄詳細（チャート + 4軸分析パネル + 保有情報フォーム）
+      ticker/[id]/         # 銘柄詳細（チャート + RSIチャート + 4軸分析パネル + 保有情報フォーム）
       users/                # ユーザー管理（追加・削除、UserManagement.tsx）
+      settings/              # 自分のAnthropic APIキー登録（AnthropicKeyForm.tsx）
     api/
       watchlist/         # 銘柄の一覧取得・追加・削除（全てuserIdでスコープ）
       watchlist/[id]/     # 削除、PATCH（保有数量・平均取得単価の設定/解除）
-      prices/[id]/        # 価格ヒストリー + 現在値
+      prices/[id]/        # 価格ヒストリー + 現在値 + RSI(14)系列
       analyze/[id]/        # 4軸分析パイプラインを実行しAnalysisSnapshotを保存
       search-ticker/        # 銘柄名/ティッカーのオートコンプリート検索
       users/                # ユーザー一覧取得・追加
@@ -75,11 +87,13 @@ src/
       simulator/                # 口座サマリー取得（GET）
       simulator/trade/            # 疑似売買の実行（POST、買い/売り）
       simulator/reset/              # 口座を元手¥500,000にリセット（POST）
+      settings/anthropic-key/         # 自分のAPIキーの設定状況取得(GET)・保存(PUT)・削除(DELETE)
       cron/refresh/             # Vercel Cronからの定期一括再分析（CRON_SECRET必須、全ユーザー対象）
   lib/
     db.ts               # Prisma Client シングルトン
     session.ts           # セッション作成/検証（jose）。ペイロードは{userId, expiresAt}
-    users.ts              # ユーザーCRUD・ログイン検証（bcryptjs）
+    users.ts              # ユーザーCRUD・ログイン検証（bcryptjs）・Anthropic APIキーの暗号化保存/復号
+    crypto.ts              # AES-256-GCM暗号化ヘルパー（ENCRYPTION_KEY、"server-only"）
     actions.ts             # 共通Server Actions（ログアウト等）
     market.ts               # ウォッチリストCRUD + 価格取得の統合ロジック（全関数userIdスコープ必須）
     portfolio.ts              # 保有銘柄の評価額・含み損益・アロケーション集計
@@ -105,18 +119,20 @@ src/
       signal.ts                                # 5軸を重み付け合成 + Claudeで根拠説明文を生成
   components/            # UIコンポーネント（AnalysisPanelsが分析結果の表示を担当）
 prisma/
-  schema.prisma          # User, WatchlistItem, AnalysisSnapshot,
+  schema.prisma          # User(anthropicApiKeyEncrypted含む), WatchlistItem, AnalysisSnapshot,
                           # SimulatorAccount/SimulatorPosition/SimulatorTrade
 ```
 
 ## セットアップ
 
-1. `.env.example` を `.env` にコピーし、値を設定（`FINNHUB_API_KEY`, `ANTHROPIC_API_KEY` は無料登録して取得。
-   `APP_PASSWORD`はマルチユーザー化に伴い廃止済みで不要）
+1. `.env.example` を `.env` にコピーし、値を設定（`SESSION_SECRET`/`ENCRYPTION_KEY`は乱数生成、
+   `FINNHUB_API_KEY`は無料登録して取得。`APP_PASSWORD`はマルチユーザー化に伴い廃止済みで不要。
+   `ANTHROPIC_API_KEY`という環境変数は存在しない——各ユーザーがログイン後`/settings`で個別に設定する）
 2. `npm install`
 3. `npx prisma migrate dev` — ローカルSQLite DBを作成
 4. `npm run dev` — http://localhost:3000 を開くと、ユーザーが0件なら自動で`/setup`に案内される
-   （初回アカウント作成後は通常のログイン画面。2人目以降は`/users`から追加）
+   （初回アカウント作成後は通常のログイン画面。2人目以降は`/users`から追加。AIによる要約・根拠
+   説明を使いたい各ユーザーは`/settings`で自分のAnthropic APIキーを登録する）
 
 ## 実装状況
 
@@ -132,7 +148,11 @@ prisma/
   全データアクセス関数のuserIdスコープ化）— 単一パスワード方式から移行済み
 - [x] フェーズ9: 投資シミュレーター（`/simulator`。ユーザーごとに元手¥500,000の疑似口座を
   1つ持ち、実際の現在値×都度取得のUSD/JPYレートで疑似売買。加重平均取得単価で確定損益/含み損益を分離)
+- [x] フェーズ10: 銘柄詳細ページにRSI(14)チャート追加（`RsiChart.tsx`、75/30に買われすぎ/売られすぎの基準線）
+- [x] フェーズ11: AnthropicのAPIキーをユーザーごとに個別管理する方式に変更（`/settings`、
+  `User.anthropicApiKeyEncrypted`をAES-256-GCM暗号化保存）。アプリ全体で共有するキーを廃止し、
+  分析実行時のClaude利用料は実行したユーザー自身のAnthropicアカウントに請求されるようにした
 
-全フェーズの土台は完成。残っているのはユーザー側の作業（Finnhub/AnthropicのAPIキー取得、
-Postgresへの切り替え、Vercelへの実デプロイ）と、実運用しながらのスコアリング重み・
-閾値のチューニング。
+全フェーズの土台は完成。残っているのはユーザー側の作業（Finnhubの共有APIキー取得、各ユーザーが
+`/settings`から自分のAnthropic APIキーを登録、Postgresへの切り替え、Vercelへの実デプロイ）と、
+実運用しながらのスコアリング重み・閾値のチューニング。

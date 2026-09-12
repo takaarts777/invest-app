@@ -19,14 +19,20 @@ cp .env.example .env
 | 変数 | 内容 | 取得方法 |
 | --- | --- | --- |
 | `SESSION_SECRET` | セッションCookie署名用の秘密鍵 | `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` |
+| `ENCRYPTION_KEY` | 各ユーザーのAnthropic APIキーをDBに暗号化保存するための鍵 | `SESSION_SECRET`と同じコマンドで生成 |
 | `FINNHUB_API_KEY` | 米国株/ETFのファンダメンタルズ分析（PER/ROE等）用 | https://finnhub.io/register で無料登録 |
-| `ANTHROPIC_API_KEY` | ニュースセンチメント判定・買い時/売り時の根拠説明生成用 | https://console.anthropic.com/ |
 | `CRON_SECRET` | Vercel Cronからの定期再分析リクエストを認証する秘密鍵 | 任意の文字列（ローカルではそのままでOK） |
 
 ※ ウォッチリストへの銘柄追加・価格チャート表示・暗号資産のファンダメンタルズ分析は
-`FINNHUB_API_KEY`/`ANTHROPIC_API_KEY`なしでも動きます（Yahoo Finance非公式APIとCoinGeckoは
-キー不要）。この2つのキーが未設定の場合、対応する分析パネルには「未設定」の案内が表示され、
+`FINNHUB_API_KEY`なしでも動きます（Yahoo Finance非公式APIとCoinGeckoはキー不要）。
+未設定の場合、ファンダメンタルズ分析パネルには「未設定」の案内が表示され、
 総合判定は残りの軸だけで算出されます（アプリは壊れません）。
+
+**AnthropicのAPIキーはアプリ全体で共有せず、ユーザーごとに個別設定**します（ログイン後の
+「設定」ページから、各ユーザーが自分のAnthropicアカウントで取得したキーを登録）。こうすること
+で、ニュースセンチメント要約・買い時/売り時の根拠説明を生成するたびの利用料が、アプリを動かして
+いる人ではなく実際に分析を実行したユーザー自身に請求されます。キー未設定のユーザーもアプリ自体
+は問題なく使え、AI生成部分だけ「未設定」の案内に置き換わります。
 
 ### 2. インストール & DB初期化
 
@@ -58,7 +64,8 @@ http://localhost:3000 を開いてください。**初回はユーザーが0件�
      ```
    - `DATABASE_URL` をPostgresの接続URLに差し替えて `npx prisma migrate dev` を再実行（新しいマイグレーション履歴が作られます）
 2. GitHubにpushし、[Vercel](https://vercel.com) でプロジェクトをインポート
-3. Vercelの環境変数に `.env` と同じキー（`DATABASE_URL`, `SESSION_SECRET`, `FINNHUB_API_KEY`, `ANTHROPIC_API_KEY`, `CRON_SECRET`）を設定
+3. Vercelの環境変数に `.env` と同じキー（`DATABASE_URL`, `SESSION_SECRET`, `ENCRYPTION_KEY`, `FINNHUB_API_KEY`, `CRON_SECRET`）を設定
+   （`ANTHROPIC_API_KEY`は不要——各ユーザーがログイン後の「設定」ページで自分のキーを登録します）
 4. デプロイ後に発行されるURLへスマホ・PCどちらからでもアクセス可能
 
 ### 定期更新（Vercel Cron）

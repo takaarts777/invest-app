@@ -18,8 +18,9 @@ export type SentimentResult =
        *  US_STOCK/LEVERAGED_ETF (S&P 500-wide), alternative.me's for
        *  CRYPTO — both are shown as the "Dumb Money" read. */
       fearGreed: { value: number; classification: string; source: string } | null;
-      /** false when ANTHROPIC_API_KEY isn't set — headlines/fear-greed are
-       *  still shown, just without an AI-scored headline read or summary. */
+      /** false when the requesting user hasn't set their own Anthropic API
+       *  key (or the call failed) — headlines/fear-greed are still shown,
+       *  just without an AI-scored headline read or summary. */
       aiSummaryAvailable: boolean;
     }
   | { available: false; reason: string };
@@ -56,11 +57,9 @@ function extractJson(text: string): unknown {
 
 async function scoreHeadlinesWithClaude(
   displayName: string,
-  headlines: { title: string; publisher: string }[]
+  headlines: { title: string; publisher: string }[],
+  apiKey: string
 ): Promise<{ score: number; summary: string }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
-
   const client = new Anthropic({ apiKey });
   const headlinesText = headlines
     .map((h, i) => `${i + 1}. ${h.title}（出典: ${h.publisher}）`)
@@ -98,7 +97,11 @@ ${headlinesText}
 }
 
 export async function analyzeSentiment(
-  item: WatchlistItem
+  item: WatchlistItem,
+  /** The requesting user's own Anthropic API key, or null if they haven't
+   *  set one — each user pays for their own Claude usage, there is no
+   *  app-wide shared key. */
+  anthropicApiKey: string | null
 ): Promise<SentimentResult> {
   // Crypto news search works much better by coin name ("Bitcoin") than by
   // ticker ("BTC-USD" returns mostly unrelated results).
@@ -127,20 +130,23 @@ export async function analyzeSentiment(
   let aiSummary = "";
   let aiSummaryAvailable = true;
 
-  if (headlines.length > 0) {
+  if (headlines.length > 0 && anthropicApiKey) {
     try {
       const result = await scoreHeadlinesWithClaude(
         item.displayName ?? item.symbol,
-        headlines
+        headlines,
+        anthropicApiKey
       );
       headlineScore = result.score;
       aiSummary = result.summary;
     } catch {
-      // No ANTHROPIC_API_KEY (or the call failed) — still show the raw
-      // headlines and any Fear & Greed reading rather than failing the
-      // whole axis.
+      // The call failed (bad/revoked key, rate limit, etc.) — still show
+      // the raw headlines and any Fear & Greed reading rather than
+      // failing the whole axis.
       aiSummaryAvailable = false;
     }
+  } else if (headlines.length > 0) {
+    aiSummaryAvailable = false;
   }
 
   const fearGreedScore = fearGreed ? (fearGreed.value - 50) / 50 : null;
@@ -159,7 +165,9 @@ export async function analyzeSentiment(
   }
   if (!aiSummaryAvailable && headlines.length > 0) {
     summaryParts.push(
-      "（ANTHROPIC_API_KEY未設定のため見出しの自動要約はありません。下の見出し一覧を参照してください。）"
+      anthropicApiKey
+        ? "（AIによる見出しの自動要約に失敗しました。下の見出し一覧を参照してください。）"
+        : "（Anthropic APIキーが未設定のため見出しの自動要約はありません。設定ページからご自身のAPIキーを登録すると利用できます。下の見出し一覧を参照してください。）"
     );
   }
 

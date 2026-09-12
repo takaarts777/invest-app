@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUserId } from "@/lib/session";
 import { getWatchlistItem } from "@/lib/market";
+import { getAnthropicApiKey } from "@/lib/users";
 import { runFullAnalysis, snapshotDataFrom } from "@/lib/analysis/signal";
 import { prisma } from "@/lib/db";
 
@@ -20,7 +21,8 @@ export async function POST(
   }
 
   try {
-    const result = await runFullAnalysis(item);
+    const anthropicApiKey = await getAnthropicApiKey(userId);
+    const result = await runFullAnalysis(item, anthropicApiKey);
 
     const snapshot = await prisma.analysisSnapshot.create({
       data: { watchlistItemId: item.id, ...snapshotDataFrom(result) },

@@ -30,6 +30,13 @@ model User {
   passwordHash String
   createdAt    DateTime @default(now())
 
+  // The user's own Anthropic API key (AES-256-GCM encrypted at rest with
+  // ENCRYPTION_KEY — see lib/crypto.ts), used for their sentiment/
+  // rationale analyses so Claude usage is billed to their own Anthropic
+  // account rather than the app owner's. Null means "not set": analysis
+  // still runs, just without the AI-generated summary/rationale.
+  anthropicApiKeyEncrypted String?
+
   watchlistItems   WatchlistItem[]
   simulatorAccount SimulatorAccount?
 }

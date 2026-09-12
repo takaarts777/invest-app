@@ -44,13 +44,20 @@ function labelFor(score: number): string {
   return "中立";
 }
 
-export async function runFullAnalysis(item: WatchlistItem): Promise<FullAnalysis> {
+export async function runFullAnalysis(
+  item: WatchlistItem,
+  /** The requesting user's own Anthropic API key, or null if they haven't
+   *  set one on the /settings page. There is no app-wide shared key —
+   *  each user's Claude usage (sentiment summary + this rationale) is
+   *  billed to their own Anthropic account. */
+  anthropicApiKey: string | null
+): Promise<FullAnalysis> {
   const { history } = await fetchPriceDataFor(item);
 
   const technical = analyzeTechnical(history);
   const anomaly = analyzeAnomaly(item, history);
   const fundamental = await analyzeFundamental(item);
-  const sentiment = await analyzeSentiment(item);
+  const sentiment = await analyzeSentiment(item, anthropicApiKey);
   const smartMoney = await analyzeSmartMoney(item);
 
   const parts: { weight: number; score: number }[] = [];
@@ -74,15 +81,19 @@ export async function runFullAnalysis(item: WatchlistItem): Promise<FullAnalysis
       : 0;
   const compositeLabel = labelFor(compositeScore);
 
-  const rationale = await generateRationale(item, {
-    technical,
-    fundamental,
-    sentiment,
-    smartMoney,
-    anomaly,
-    compositeScore,
-    compositeLabel,
-  });
+  const rationale = await generateRationale(
+    item,
+    {
+      technical,
+      fundamental,
+      sentiment,
+      smartMoney,
+      anomaly,
+      compositeScore,
+      compositeLabel,
+    },
+    anthropicApiKey
+  );
 
   return {
     technical,
@@ -180,11 +191,11 @@ function buildPrompt(item: WatchlistItem, data: RationaleInput): string {
 
 async function generateRationale(
   item: WatchlistItem,
-  data: RationaleInput
+  data: RationaleInput,
+  apiKey: string | null
 ): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return "（ANTHROPIC_API_KEYが未設定のため、AIによる根拠説明は生成されていません。各分析パネルの数値を参考にしてください。）";
+    return "（Anthropic APIキーが未設定のため、AIによる根拠説明は生成されていません。設定ページからご自身のAPIキーを登録すると利用できます。各分析パネルの数値を参考にしてください。）";
   }
 
   try {
