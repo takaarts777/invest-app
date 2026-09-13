@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { StockRecommendation } from "@/lib/recommendations";
-import { HORIZON_LABEL, type InvestmentHorizon } from "@/lib/recommendations-constants";
+import { HORIZON_LABEL, HORIZON_PERIOD, type InvestmentHorizon } from "@/lib/recommendations-constants";
 import { LABEL_BADGE_COLOR } from "@/lib/signal-badge";
 
 const HORIZON_BADGE: Record<InvestmentHorizon, string> = {
@@ -128,8 +128,11 @@ export function RecommendationsSection({
               >
                 {r.compositeLabel}
               </span>
-              <span className={`rounded-full px-2 py-0.5 font-medium ${HORIZON_BADGE[r.horizon]}`}>
-                おすすめ投資期間: {HORIZON_LABEL[r.horizon]}
+              <span
+                className={`rounded-full px-2 py-0.5 font-medium ${HORIZON_BADGE[r.horizon]}`}
+                title="各指標が効果を発揮するまでの目安期間から逆算した目安で、厳密な日数の基準ではありません。"
+              >
+                おすすめ投資期間: {HORIZON_LABEL[r.horizon]}（{HORIZON_PERIOD[r.horizon]}）
               </span>
             </div>
 
