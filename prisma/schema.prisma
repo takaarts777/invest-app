@@ -134,10 +134,11 @@ model AnalysisSnapshot {
   sentimentScore   Float? // raw crowd-sentiment reading ("Dumb Money"); composite uses its sign-flipped contrarian value
   anomalyScore     Float?
   smartMoneyScore  Float? // insider buy/sell reading ("Smart Money"), US stocks only
+  divergenceScore  Float? // RSI/price divergence axis; -1 (bearish) .. +1 (bullish), 0 when none found
   compositeScore   Float?
   compositeLabel   String?
-  // "bullish" | "bearish" | null — set when analyzeAnomaly detects an RSI/
-  // price divergence, so the dashboard can badge it without parsing
+  // "bullish" | "bearish" | null — set when analyzeDivergence detects an
+  // RSI/price divergence, so the dashboard can badge it without parsing
   // rawDetails JSON for every watchlist row.
   divergenceSignal String?
 

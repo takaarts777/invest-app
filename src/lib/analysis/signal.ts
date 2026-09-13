@@ -6,6 +6,7 @@ import { analyzeFundamental, type FundamentalMetrics } from "./fundamental";
 import { analyzeSentiment, type SentimentResult } from "./sentiment";
 import { analyzeAnomaly, type AnomalyMetrics } from "./anomaly";
 import { analyzeSmartMoney, type SmartMoneyMetrics } from "./smartmoney";
+import { analyzeDivergence, type DivergenceMetrics } from "./divergence";
 
 export type FullAnalysis = {
   technical: TechnicalMetrics | null;
@@ -17,6 +18,9 @@ export type FullAnalysis = {
    *  (non-contrarian) to compositeScore. */
   smartMoney: SmartMoneyMetrics;
   anomaly: AnomalyMetrics | null;
+  /** RSI/price divergence — its own axis, separate from the general
+   *  anomaly scan (used to be folded into it). */
+  divergence: DivergenceMetrics | null;
   /** -1 (strong sell) .. +1 (strong buy) */
   compositeScore: number;
   compositeLabel: string;
@@ -27,13 +31,16 @@ export type FullAnalysis = {
 // couldn't be computed (missing data / API key) are dropped and the
 // remaining weights renormalized, so e.g. a crypto ticker's composite is
 // still meaningful without a "smart money" read (insiders don't exist for
-// crypto/ETFs).
+// crypto/ETFs). Divergence is included even when it found nothing (score
+// 0, i.e. neutral) — like technical/anomaly, it's "available" whenever
+// there's enough price history, it just usually has nothing to report.
 const WEIGHTS = {
-  technical: 0.3,
-  fundamental: 0.2,
-  sentiment: 0.2,
-  anomaly: 0.15,
+  technical: 0.25,
+  fundamental: 0.15,
+  sentiment: 0.15,
+  anomaly: 0.1,
   smartMoney: 0.15,
+  divergence: 0.2,
 };
 
 function labelFor(score: number): string {
@@ -56,6 +63,7 @@ export async function runFullAnalysis(
 
   const technical = analyzeTechnical(history);
   const anomaly = analyzeAnomaly(item, history);
+  const divergence = analyzeDivergence(history);
   const fundamental = await analyzeFundamental(item);
   const sentiment = await analyzeSentiment(item, anthropicApiKey);
   const smartMoney = await analyzeSmartMoney(item);
@@ -73,6 +81,7 @@ export async function runFullAnalysis(
   if (anomaly) parts.push({ weight: WEIGHTS.anomaly, score: anomaly.score });
   if (smartMoney.available)
     parts.push({ weight: WEIGHTS.smartMoney, score: smartMoney.score });
+  if (divergence) parts.push({ weight: WEIGHTS.divergence, score: divergence.score });
 
   const totalWeight = parts.reduce((s, p) => s + p.weight, 0);
   const compositeScore =
@@ -89,6 +98,7 @@ export async function runFullAnalysis(
       sentiment,
       smartMoney,
       anomaly,
+      divergence,
       compositeScore,
       compositeLabel,
     },
@@ -101,6 +111,7 @@ export async function runFullAnalysis(
     sentiment,
     smartMoney,
     anomaly,
+    divergence,
     compositeScore,
     compositeLabel,
     rationale,
@@ -111,11 +122,9 @@ export async function runFullAnalysis(
  *  expects (minus watchlistItemId), shared by the on-demand analyze route
  *  and the cron refresh route so they can't drift apart. */
 export function snapshotDataFrom(analysis: FullAnalysis) {
-  const findings = analysis.anomaly?.findings ?? [];
-  const divergenceSignal = findings.some((f) => f.type === "bearish_divergence")
-    ? "bearish"
-    : findings.some((f) => f.type === "bullish_divergence")
-      ? "bullish"
+  const divergenceSignal =
+    analysis.divergence && analysis.divergence.signal !== "none"
+      ? analysis.divergence.signal
       : null;
 
   return {
@@ -124,6 +133,7 @@ export function snapshotDataFrom(analysis: FullAnalysis) {
     sentimentScore: analysis.sentiment.available ? analysis.sentiment.score : null,
     anomalyScore: analysis.anomaly?.score ?? null,
     smartMoneyScore: analysis.smartMoney.available ? analysis.smartMoney.score : null,
+    divergenceScore: analysis.divergence?.score ?? null,
     compositeScore: analysis.compositeScore,
     compositeLabel: analysis.compositeLabel,
     divergenceSignal,
@@ -134,6 +144,7 @@ export function snapshotDataFrom(analysis: FullAnalysis) {
       sentiment: analysis.sentiment,
       smartMoney: analysis.smartMoney,
       anomaly: analysis.anomaly,
+      divergence: analysis.divergence,
     }),
   };
 }
@@ -144,6 +155,7 @@ type RationaleInput = {
   sentiment: SentimentResult;
   smartMoney: SmartMoneyMetrics;
   anomaly: AnomalyMetrics | null;
+  divergence: DivergenceMetrics | null;
   compositeScore: number;
   compositeLabel: string;
 };
@@ -170,9 +182,13 @@ function buildPrompt(item: WatchlistItem, data: RationaleInput): string {
       "特筆すべき異常は検出されませんでした。"
     : "データ不足のため分析できませんでした。";
 
+  const divergenceText = data.divergence
+    ? (data.divergence.events[0]?.description ?? "直近60営業日以内にRSI/価格のダイバージェンスは検出されませんでした。")
+    : "データ不足のため分析できませんでした。";
+
   return `あなたは投資分析アシスタントです。以下は「${item.symbol}」${
     item.displayName ? `（${item.displayName}）` : ""
-  }についての5軸のルールベース分析結果です。この数値・事実データ**のみ**に基づいて、日本語で3〜5文の簡潔な根拠説明を書いてください。
+  }についての6軸のルールベース分析結果です。この数値・事実データ**のみ**に基づいて、日本語で3〜5文の簡潔な根拠説明を書いてください。
 
 厳守事項:
 - ここに書かれていない数値やニュースを作り出さないこと
@@ -186,7 +202,8 @@ function buildPrompt(item: WatchlistItem, data: RationaleInput): string {
 【ファンダメンタル分析】${fundamentalText}
 【ニュースセンチメント／Dumb Money（逆張り指標）】${sentimentText}
 【Smart Money（インサイダー取引）】${smartMoneyText}
-【アノマリー分析】${anomalyText}`;
+【アノマリー分析】${anomalyText}
+【RSI/価格ダイバージェンス】${divergenceText}`;
 }
 
 async function generateRationale(

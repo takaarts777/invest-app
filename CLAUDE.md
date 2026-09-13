@@ -3,8 +3,9 @@
 # 投資アナリティクス Web アプリ
 
 個人用の投資分析Webアプリ。米国株・暗号資産・レバレッジETFのウォッチリストを管理し、
-テクニカル／ファンダメンタル／ニュースセンチメント／アノマリーの4軸で分析、
-ルールベース判定 + Claude(LLM)による根拠説明付きの買い時・売り時シグナルを表示する。
+テクニカル／ファンダメンタル／ニュースセンチメント／アノマリー／Smart Money／
+RSI・価格ダイバージェンスの6軸で分析、ルールベース判定 + Claude(LLM)による根拠説明付きの
+買い時・売り時シグナルを表示する。
 
 詳細な設計・実装フェーズは元計画を参照: `C:\Users\artis\.claude\plans\happy-snacking-cloud.md`
 
@@ -22,7 +23,7 @@
   - Yahoo Finance非公式API（無料・キー不要）: `/v8/finance/chart/` で米国株/ETFの現在値・日足ヒストリカル・銘柄名、`/v1/finance/search` でニュース見出し（株/ETF/暗号資産共通。暗号資産はティッカーでなく`displayName`で検索する方が精度が良い）。`/v10/finance/quoteSummary`は401で使用不可（crumb認証が必要になったため不採用）。Stooqはボット判定JSチャレンジを返すため不採用。
   - CoinGecko（無料・キー不要）: 暗号資産の価格・日足ヒストリカル（`/coins/{id}/ohlc`）・ファンダメンタルズ相当データ（`/coins/{id}` — 時価総額ランク・ATHからの乖離・供給量等）
   - Finnhub（`FINNHUB_API_KEY`必須）: 株/ETFのファンダメンタルズ（`/stock/metric?metric=all` — PER/PBR/ROE/売上成長率等）。企業ニュース取得用の`fetchCompanyNews`も実装済みだが現状はYahoo検索で代替しており未使用。
-  - Anthropic Claude（`claude-sonnet-5`）: ニュース見出しからのセンチメントスコア算出、4軸分析結果を根拠にした買い時/売り時の説明文生成。**アプリ全体で共有するAPIキーは存在しない**——各ユーザーが`/settings`ページで自分のAnthropic APIキーを登録し（`User.anthropicApiKeyEncrypted`にAES-256-GCM暗号化して保存、`lib/crypto.ts`）、そのユーザーの分析実行時だけ`lib/users.ts`の`getAnthropicApiKey(userId)`で復号して使う。これはオーナー1人が全ユーザー分のClaude利用料を負担しないための設計。キー未設定時は例外を投げず「未設定」を示すメッセージにフォールバックする。
+  - Anthropic Claude（`claude-sonnet-5`）: ニュース見出しからのセンチメントスコア算出、6軸分析結果を根拠にした買い時/売り時の説明文生成。**アプリ全体で共有するAPIキーは存在しない**——各ユーザーが`/settings`ページで自分のAnthropic APIキーを登録し（`User.anthropicApiKeyEncrypted`にAES-256-GCM暗号化して保存、`lib/crypto.ts`）、そのユーザーの分析実行時だけ`lib/users.ts`の`getAnthropicApiKey(userId)`で復号して使う。これはオーナー1人が全ユーザー分のClaude利用料を負担しないための設計。キー未設定時は例外を投げず「未設定」を示すメッセージにフォールバックする。
   - Google News RSS（無料・キー不要、`hl=ja&gl=JP&ceid=JP:ja`）: 経済指標カレンダーの各イベント（FOMC/CPI/NFP）に紐づく日本語ニュースの見出し・リンク取得（`lib/providers/googlenews.ts`）。Yahoo Financeのニュース検索はほぼ英語記事しか返らないため、日本語記事が必要なこの用途だけ別プロバイダを使っている。Googleの著作権表示上は個人利用のフィードリーダー向け想定なので、他の非公式API同様「個人用アプリの範囲での利用」と割り切って使用。
 - Anthropic SDK（Claude — センチメント判定・シグナル根拠説明。フェーズ5以降で使用）
 
@@ -60,7 +61,7 @@
 - `/api/cron/refresh`: 全ユーザー分を一括処理するため、`WatchlistItem.userId`ごとに個別のキーを引く
   （`apiKeyCache`でユーザーごとに1回だけ復号）
 - キー未設定のユーザーは例外にせず、`sentiment.ts`/`signal.ts`側で「未設定」の案内文にフォールバックする
-  （他の4/5軸の分析は普通に動く）
+  （AI要約・根拠説明文以外の軸の分析は普通に動く）
 
 ## ディレクトリ構成
 
@@ -74,14 +75,14 @@ src/
                           # セクターヒートマップ + 自分のウォッチリスト）
       portfolio/          # 保有中の銘柄の評価額・含み損益・アロケーション
       simulator/           # 疑似売買シミュレーター（元手¥500,000、実際の資産は動かない）
-      ticker/[id]/         # 銘柄詳細（チャート + RSIチャート + 4軸分析パネル + 保有情報フォーム）
+      ticker/[id]/         # 銘柄詳細（チャート + RSIチャート + 6軸分析パネル + 保有情報フォーム）
       users/                # ユーザー管理（追加・削除、UserManagement.tsx）
       settings/              # 自分のAnthropic APIキー登録（AnthropicKeyForm.tsx）
     api/
       watchlist/         # 銘柄の一覧取得・追加・削除（全てuserIdでスコープ）
       watchlist/[id]/     # 削除、PATCH（保有数量・平均取得単価の設定/解除）
       prices/[id]/        # 価格ヒストリー + 現在値 + RSI(14)系列
-      analyze/[id]/        # 4軸分析パイプラインを実行しAnalysisSnapshotを保存
+      analyze/[id]/        # 6軸分析パイプラインを実行しAnalysisSnapshotを保存
       search-ticker/        # 銘柄名/ティッカーのオートコンプリート検索
       users/                # ユーザー一覧取得・追加
       users/[id]/            # ユーザー削除（自分自身は削除不可）
@@ -119,8 +120,10 @@ src/
       sentiment.ts                           # ニュース見出し取得 + Claudeでセンチメントスコア化
       smartmoney.ts                           # インサイダー取引（Smart Money）
       anomaly.ts                               # 出来高/価格急変・カレンダー効果・レバレッジ減価リスク・
-                                                # 移動平均乖離・RSI底値の過去傾向比較・ダイバージェンス
-      signal.ts                                # 5軸を重み付け合成 + Claudeで根拠説明文を生成
+                                                # 移動平均乖離・RSI底値の過去傾向比較
+      divergence.ts                             # RSI/価格ダイバージェンス（独立軸。直近60営業日のピボットを
+                                                # 全走査し、直近シグナルだけでなく検出履歴も返す）
+      signal.ts                                # 6軸を重み付け合成 + Claudeで根拠説明文を生成
   components/            # UIコンポーネント（AnalysisPanelsが分析結果の表示を担当）
 prisma/
   schema.prisma          # User(anthropicApiKeyEncrypted含む), WatchlistItem, AnalysisSnapshot,
@@ -161,6 +164,11 @@ prisma/
   `url`(プールあり)/`directUrl`(プールなし、`prisma migrate`専用)構成に変更。ローカル開発も
   Vercelデプロイ用のNeon DBを共有する前提に統一し、旧SQLite用マイグレーション履歴は削除して
   作り直した）。友人とのプロトタイプ運用のためVercel(Hobbyプラン)+GitHubでのデプロイに着手
+- [x] フェーズ13: ダイバージェンス分析を独立軸に拡張（`analysis/divergence.ts`新設、
+  アノマリー分析から分離）。直近の1組のピボットだけでなく検出期間内の全ピボットを走査して
+  履歴（最大5件）を返すようにし、`AnalysisPanels`に専用の「ダイバージェンス分析」カードを追加。
+  総合判定の重みも技術/ファンダ/センチメント/アノマリー/Smart Money/ダイバージェンスの6軸に
+  再配分（`AnalysisSnapshot.divergenceScore`追加）
 
 全フェーズの土台は完成。残っているのはユーザー側の作業（Finnhubの共有APIキー取得、各ユーザーが
 `/settings`から自分のAnthropic APIキーを登録、Vercelへの実デプロイ）と、

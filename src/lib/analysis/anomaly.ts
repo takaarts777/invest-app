@@ -39,48 +39,13 @@ function stddev(values: number[]): number {
   return Math.sqrt(variance);
 }
 
-// RSI divergence: a swing point must be higher/lower than this many bars
-// on *each* side to count as confirmed (filters noise; means a pivot can
-// only be recognized once it's this many days in the past).
-const DIVERGENCE_PIVOT_WINDOW = 5;
-// Only compare the two most recent swing points within this many trading
-// days, so the read stays relevant to current conditions (~3 months).
-const DIVERGENCE_LOOKBACK_DAYS = 60;
-
-type PricePivot = { index: number; date: string; price: number; rsi: number };
-
-/** Confirmed local price highs/lows (a bar higher/lower than
- *  DIVERGENCE_PIVOT_WINDOW bars on each side), paired with RSI's value at
- *  that same bar so the two series can be compared point-for-point. */
-function findPricePivots(
-  bars: DailyBar[],
-  closes: number[],
-  rsiArr: number[],
-  rsiOffset: number,
-  kind: "high" | "low",
-  window: number
-): PricePivot[] {
-  const pivots: PricePivot[] = [];
-  for (let i = window; i < closes.length - window; i++) {
-    const slice = closes.slice(i - window, i + window + 1);
-    const isPivot =
-      kind === "high" ? closes[i] === Math.max(...slice) : closes[i] === Math.min(...slice);
-    if (!isPivot) continue;
-
-    const rsiIdx = i - rsiOffset;
-    if (rsiIdx < 0 || rsiIdx >= rsiArr.length) continue;
-
-    pivots.push({ index: i, date: bars[i].date, price: closes[i], rsi: rsiArr[rsiIdx] });
-  }
-  return pivots;
-}
-
 /**
  * Rule-based anomaly scan over price/volume history:
  * volume & price spikes, calendar effects, leveraged-ETF volatility decay,
- * statistical deviation from the 20-day average, an RSI-trough historical
- * comparison, and RSI/price divergence. Returns null when there isn't
- * enough history.
+ * statistical deviation from the 20-day average, and an RSI-trough
+ * historical comparison. RSI/price divergence used to live here too but
+ * is now its own axis — see analysis/divergence.ts. Returns null when
+ * there isn't enough history.
  */
 export function analyzeAnomaly(
   item: WatchlistItem,
@@ -227,66 +192,6 @@ export function analyzeAnomaly(
         ).toFixed(1)}%`,
         severity: avgReturn > 0 ? "opportunity" : "warning",
       });
-    }
-  }
-
-  // 7. RSI/price divergence: compare the two most recent confirmed price
-  // swing highs (or lows) against RSI's value at those same two points.
-  // Bearish divergence = price makes a higher high while RSI makes a
-  // lower high (momentum not confirming the new high). Bullish = the
-  // mirror image at swing lows.
-  if (rsiArr.length > DIVERGENCE_PIVOT_WINDOW * 2 + 2) {
-    const recentStart = Math.max(0, closes.length - DIVERGENCE_LOOKBACK_DAYS);
-
-    const highs = findPricePivots(
-      bars,
-      closes,
-      rsiArr,
-      offset,
-      "high",
-      DIVERGENCE_PIVOT_WINDOW
-    ).filter((p) => p.index >= recentStart);
-    const lows = findPricePivots(
-      bars,
-      closes,
-      rsiArr,
-      offset,
-      "low",
-      DIVERGENCE_PIVOT_WINDOW
-    ).filter((p) => p.index >= recentStart);
-
-    if (highs.length >= 2) {
-      const [a, b] = highs.slice(-2);
-      if (b.price > a.price && b.rsi < a.rsi) {
-        n++;
-        score -= 0.5;
-        findings.push({
-          type: "bearish_divergence",
-          description: `弱気のダイバージェンス検出: ${a.date}→${b.date}で価格は高値更新(${a.price.toFixed(
-            2
-          )}→${b.price.toFixed(2)})したが、RSIは逆に低下(${a.rsi.toFixed(1)}→${b.rsi.toFixed(
-            1
-          )})。上昇モメンタムの鈍化を示唆し、反落に注意。`,
-          severity: "warning",
-        });
-      }
-    }
-
-    if (lows.length >= 2) {
-      const [a, b] = lows.slice(-2);
-      if (b.price < a.price && b.rsi > a.rsi) {
-        n++;
-        score += 0.5;
-        findings.push({
-          type: "bullish_divergence",
-          description: `強気のダイバージェンス検出: ${a.date}→${b.date}で価格は安値更新(${a.price.toFixed(
-            2
-          )}→${b.price.toFixed(2)})したが、RSIは逆に上昇(${a.rsi.toFixed(1)}→${b.rsi.toFixed(
-            1
-          )})。下落モメンタムの鈍化を示唆し、反発の可能性。`,
-          severity: "opportunity",
-        });
-      }
     }
   }
 

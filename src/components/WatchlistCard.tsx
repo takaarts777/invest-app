@@ -65,7 +65,7 @@ export function WatchlistCard({
             className={`rounded-full px-2.5 py-1 text-xs font-medium ${
               DIVERGENCE_BADGE[snapshot.divergenceSignal].className
             }`}
-            title="RSIダイバージェンスを検出しました（詳細は銘柄ページのアノマリー分析欄）"
+            title="RSIダイバージェンスを検出しました（詳細は銘柄ページのダイバージェンス分析欄）"
           >
             {DIVERGENCE_BADGE[snapshot.divergenceSignal].label}
           </span>

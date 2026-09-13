@@ -8,6 +8,7 @@ import type { FundamentalMetrics } from "@/lib/analysis/fundamental";
 import type { SentimentResult } from "@/lib/analysis/sentiment";
 import type { SmartMoneyMetrics } from "@/lib/analysis/smartmoney";
 import type { AnomalyMetrics } from "@/lib/analysis/anomaly";
+import type { DivergenceMetrics } from "@/lib/analysis/divergence";
 import { SpeedometerGauge } from "@/components/SpeedometerGauge";
 
 type RawDetails = {
@@ -16,6 +17,7 @@ type RawDetails = {
   sentiment: SentimentResult;
   smartMoney: SmartMoneyMetrics;
   anomaly: AnomalyMetrics | null;
+  divergence: DivergenceMetrics | null;
 };
 
 const STALE_REASON =
@@ -55,6 +57,7 @@ function parseRawDetails(raw: string | null | undefined): RawDetails | null {
       sentiment: normalizeAvailable<SentimentResult>(parsed.sentiment),
       smartMoney: normalizeAvailable<SmartMoneyMetrics>(parsed.smartMoney),
       anomaly: parsed.anomaly ?? null,
+      divergence: parsed.divergence ?? null,
     };
   } catch {
     return null;
@@ -168,6 +171,8 @@ export function AnalysisPanels({
           </p>
         )}
       </div>
+
+      {details && <DivergenceCard data={details.divergence} />}
 
       {details && <SentimentCard data={details.sentiment} />}
 
@@ -587,43 +592,82 @@ const SEVERITY_BORDER: Record<string, string> = {
   alert: "border-red-500 text-red-300",
 };
 
-const DIVERGENCE_TYPES = ["bullish_divergence", "bearish_divergence"];
-
 function AnomalyCard({ data }: { data: AnomalyMetrics | null }) {
-  const divergenceFinding = data?.findings.find((f) => DIVERGENCE_TYPES.includes(f.type));
-  const otherFindings = data?.findings.filter((f) => !DIVERGENCE_TYPES.includes(f.type)) ?? [];
-
   return (
     <Panel title="アノマリー分析">
       {!data ? (
         <Unavailable reason="データ不足のため分析できませんでした。" />
+      ) : data.findings.length === 0 ? (
+        <p className="text-sm text-slate-500">特筆すべき異常は検出されませんでした。</p>
+      ) : (
+        <ul className="space-y-2 text-sm">
+          {data.findings.map((f, i) => (
+            <li key={i} className={`border-l-2 pl-2 ${SEVERITY_BORDER[f.severity]}`}>
+              {f.description}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  );
+}
+
+const DIVERGENCE_SIGNAL_BADGE: Record<string, { label: string; className: string }> = {
+  bullish: { label: "強気のダイバージェンス発生中", className: "bg-emerald-500/15 text-emerald-400" },
+  bearish: { label: "弱気のダイバージェンス発生中", className: "bg-red-500/15 text-red-300" },
+  none: { label: "ダイバージェンスなし", className: "bg-slate-700/50 text-slate-300" },
+};
+
+const DIVERGENCE_EVENT_BORDER: Record<string, string> = {
+  bullish: "border-emerald-500 text-emerald-300",
+  bearish: "border-red-500 text-red-300",
+};
+
+/** RSI/価格ダイバージェンスの専用セクション。総合判定の直下、センチメントと
+ *  並ぶ独立軸として表示する（以前はアノマリー分析欄に埋もれていた1行だけの
+ *  表示だったものを、現在の判定＋直近の履歴が見える形に拡張したもの）。 */
+function DivergenceCard({ data }: { data: DivergenceMetrics | null }) {
+  return (
+    <Panel title="ダイバージェンス分析（RSI vs 価格）">
+      {!data ? (
+        <Unavailable reason="データ不足のため分析できませんでした（日足30本以上が必要です）。" />
       ) : (
         <>
-          {/* Always shown, found or not, so it's clear the check actually
-           *  ran — divergence only fires occasionally, so its absence
-           *  looked identical to "not implemented" without this. */}
-          <div
-            className={`mb-2 rounded-lg border-l-2 py-1 pl-2 text-sm ${
-              divergenceFinding
-                ? SEVERITY_BORDER[divergenceFinding.severity]
-                : "border-slate-700 text-slate-500"
-            }`}
-          >
-            {divergenceFinding
-              ? divergenceFinding.description
-              : "ダイバージェンス: 現在検出されていません（直近60営業日以内に価格とRSIの逆行は見られません）"}
+          <p className="text-xs text-slate-500">
+            価格の高値・安値更新とRSIの動きが逆行していないかを、直近60営業日の値動きから判定します。総合判定にもこの結果を反映しています。
+          </p>
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-slate-400">現在の判定</p>
+            <span
+              className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${DIVERGENCE_SIGNAL_BADGE[data.signal].className}`}
+            >
+              {DIVERGENCE_SIGNAL_BADGE[data.signal].label}
+            </span>
           </div>
 
-          {otherFindings.length === 0 ? (
-            <p className="text-sm text-slate-500">他に特筆すべき異常は検出されませんでした。</p>
+          <ScoreBar score={data.score} />
+
+          {data.events.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">
+              直近60営業日以内に、価格とRSIの逆行は見られませんでした。
+            </p>
           ) : (
-            <ul className="space-y-2 text-sm">
-              {otherFindings.map((f, i) => (
-                <li key={i} className={`border-l-2 pl-2 ${SEVERITY_BORDER[f.severity]}`}>
-                  {f.description}
-                </li>
-              ))}
-            </ul>
+            <>
+              <p className="mt-3 text-xs text-slate-500">検出履歴（新しい順、最大5件）</p>
+              <ul className="mt-1 space-y-2 text-sm">
+                {data.events.map((e, i) => (
+                  <li
+                    key={i}
+                    className={`border-l-2 pl-2 ${DIVERGENCE_EVENT_BORDER[e.signal]} ${
+                      i > 0 ? "text-slate-500" : ""
+                    }`}
+                  >
+                    {e.description}
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </>
       )}
