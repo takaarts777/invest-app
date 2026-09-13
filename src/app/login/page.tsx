@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
 import { userCount } from "@/lib/users";
+import { getSessionUserId } from "@/lib/session";
 import { LoginForm } from "@/components/LoginForm";
 
-// The redirect below depends on live DB state (has anyone signed up
-// yet?); Prisma reads don't force dynamic rendering the way cookies()/
-// headers() do, so without this a build-time snapshot (typically 0
-// users) could get baked in as a static page that always redirects to
-// /setup even after accounts exist.
+// The redirects below depend on live DB state (has anyone signed up
+// yet? is the current session's user still real?); Prisma reads don't
+// force dynamic rendering the way cookies()/headers() do, so without
+// this a build-time snapshot could get baked in as a static page.
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
@@ -14,6 +14,15 @@ export default async function LoginPage() {
   // showing a login form that can never succeed.
   if ((await userCount()) === 0) {
     redirect("/setup");
+  }
+
+  // Already logged in with a session that's still valid (getSessionUserId
+  // confirms the user actually still exists in the DB, unlike proxy.ts's
+  // shape-only check) — skip the form. A stale cookie for a deleted/reset
+  // user falls through to render the form below instead of bouncing back
+  // and forth with proxy.ts.
+  if (await getSessionUserId()) {
+    redirect("/");
   }
 
   return (

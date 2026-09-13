@@ -38,17 +38,21 @@ export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
-  const authed = await hasValidSession(req);
-
-  if (!isPublic && !authed) {
+  if (!isPublic && !(await hasValidSession(req))) {
     const loginUrl = new URL("/login", req.nextUrl);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (isPublic && authed) {
-    return NextResponse.redirect(new URL("/", req.nextUrl));
-  }
-
+  // Deliberately NOT redirecting an already-"authed" visitor away from
+  // /login here. hasValidSession() only checks the cookie's signature/
+  // shape (by design — this file stays DB-free to remain Edge-
+  // compatible), but /login's own getSessionUserId() call additionally
+  // confirms the user still exists in the DB. A cookie that's shape-
+  // valid but for a since-deleted/reset user would otherwise bounce
+  // "/" -> "/login" (page: not a real user -> back to login) while this
+  // proxy bounces "/login" -> "/" (shape-valid -> away from login),
+  // an infinite loop. Only /login can safely make that call, since it's
+  // the one place with the DB-verified answer.
   return NextResponse.next();
 }
 
