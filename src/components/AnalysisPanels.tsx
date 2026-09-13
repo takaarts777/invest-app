@@ -9,6 +9,7 @@ import type { SentimentResult } from "@/lib/analysis/sentiment";
 import type { SmartMoneyMetrics } from "@/lib/analysis/smartmoney";
 import type { AnomalyMetrics } from "@/lib/analysis/anomaly";
 import type { DivergenceMetrics } from "@/lib/analysis/divergence";
+import { buildExitCriteria } from "@/lib/analysis/exit-criteria";
 import { SpeedometerGauge } from "@/components/SpeedometerGauge";
 
 type RawDetails = {
@@ -128,16 +129,21 @@ export function AnalysisPanels({
           <div>
             <p className="text-xs text-slate-500">総合判定</p>
             {snapshot ? (
-              <p
-                className={`text-2xl font-semibold ${
-                  LABEL_COLOR[snapshot.compositeLabel ?? ""] ?? "text-slate-200"
-                }`}
-              >
-                {snapshot.compositeLabel}
-                <span className="ml-2 text-sm font-normal text-slate-500">
-                  (スコア {snapshot.compositeScore?.toFixed(2)})
-                </span>
-              </p>
+              <>
+                <p
+                  className={`text-2xl font-semibold ${
+                    LABEL_COLOR[snapshot.compositeLabel ?? ""] ?? "text-slate-200"
+                  }`}
+                >
+                  {snapshot.compositeLabel}
+                  <span className="ml-2 text-sm font-normal text-slate-500">
+                    (スコア {snapshot.compositeScore?.toFixed(2)})
+                  </span>
+                </p>
+                <p className="mt-0.5 text-xs text-slate-600">
+                  テクニカル・ファンダメンタル・センチメント等、複数の時間軸の指標を組み合わせた総合的な目安で、単一の投資期間を前提にしていません。期間ごとの売り時の目安は下の「保有期間別の売り時の目安」を参照してください。
+                </p>
+              </>
             ) : (
               <p className="text-sm text-slate-500">まだ分析されていません</p>
             )}
@@ -171,6 +177,15 @@ export function AnalysisPanels({
           </p>
         )}
       </div>
+
+      {details && (
+        <ExitCriteriaCard
+          technical={details.technical}
+          anomaly={details.anomaly}
+          divergence={details.divergence}
+          fundamental={details.fundamental}
+        />
+      )}
 
       {details && <DivergenceCard data={details.divergence} />}
 
@@ -608,6 +623,56 @@ function AnomalyCard({ data }: { data: AnomalyMetrics | null }) {
           ))}
         </ul>
       )}
+    </Panel>
+  );
+}
+
+const HORIZON_BORDER: Record<string, string> = {
+  short: "border-amber-500",
+  medium: "border-sky-500",
+  long: "border-violet-500",
+};
+
+/** Concrete "sell when this happens" guidance per holding period —
+ *  the composite label above says whether now looks like a buy/sell,
+ *  but blends every time horizon at once, so it can't say when a
+ *  specific holding period's thesis has broken down. This fills that
+ *  gap with rule-based triggers grounded in the ticker's own current
+ *  indicator values (computed client-side from the same rawDetails,
+ *  no extra fetch). */
+function ExitCriteriaCard({
+  technical,
+  anomaly,
+  divergence,
+  fundamental,
+}: {
+  technical: TechnicalMetrics | null;
+  anomaly: AnomalyMetrics | null;
+  divergence: DivergenceMetrics | null;
+  fundamental: FundamentalMetrics;
+}) {
+  const criteria = buildExitCriteria(technical, anomaly, divergence, fundamental);
+
+  return (
+    <Panel title="保有期間別の売り時の目安">
+      <p className="mb-3 text-xs text-slate-500">
+        「買い進めたものの、その後の材料次第ですぐ下落して損をする」を避けるための目安です。どの期間で保有するかを決めたら、対応する条件を売り時の判断材料にしてください（投資助言ではなく、機械的なルールベースの目安です）。
+      </p>
+      <div className="space-y-3">
+        {criteria.map((c) => (
+          <div key={c.horizon} className={`border-l-2 pl-3 ${HORIZON_BORDER[c.horizon]}`}>
+            <p className="text-sm font-semibold text-slate-200">
+              {c.label}
+              <span className="ml-1.5 text-xs font-normal text-slate-500">（{c.period}）</span>
+            </p>
+            <ul className="mt-1 space-y-1 text-xs text-slate-400">
+              {c.triggers.map((t, i) => (
+                <li key={i}>・{t}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
     </Panel>
   );
 }

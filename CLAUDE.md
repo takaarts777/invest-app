@@ -61,7 +61,10 @@ RSI・価格ダイバージェンスの6軸で分析、ルールベース判定 
 - `/api/cron/refresh`: 全ユーザー分を一括処理するため、`WatchlistItem.userId`ごとに個別のキーを引く
   （`apiKeyCache`でユーザーごとに1回だけ復号）
 - キー未設定のユーザーは例外にせず、`sentiment.ts`/`signal.ts`側で「未設定」の案内文にフォールバックする
-  （AI要約・根拠説明文以外の軸の分析は普通に動く）
+  （AI要約・根拠説明文以外の軸の分析は普通に動く）。ただし総合判定の根拠説明（`signal.ts`の
+  `generateRationale`）はキー未設定でも`buildRuleBasedRationale`が各軸のテキストを整形して
+  返すので「未設定」の空メッセージにはならない。ニュース見出しのAI要約（`sentiment.ts`）は
+  信頼できる無料の代替手段がないため、キー未設定時は「未設定」の案内のままにしている
 
 ## ディレクトリ構成
 
@@ -128,7 +131,12 @@ src/
                                                 # 移動平均乖離・RSI底値の過去傾向比較
       divergence.ts                             # RSI/価格ダイバージェンス（独立軸。直近60営業日のピボットを
                                                 # 全走査し、直近シグナルだけでなく検出履歴も返す）
+      exit-criteria.ts                           # 保有期間別（短期/中期/長期）の「こうなったら売る」を
+                                                # 現在の指標値から生成する純粋関数。"server-only"ではなく、
+                                                # AnalysisPanels.tsx（クライアント）が直接呼び出す
       signal.ts                                # 6軸を重み付け合成 + Claudeで根拠説明文を生成
+                                                # （APIキー未設定時はbuildRuleBasedRationaleで無料の
+                                                # ルールベース要約にフォールバック、空メッセージにはしない）
   components/            # UIコンポーネント（AnalysisPanelsが分析結果の表示を担当）
 prisma/
   schema.prisma          # User(anthropicApiKeyEncrypted含む), WatchlistItem, AnalysisSnapshot,
@@ -179,6 +187,13 @@ prisma/
   テクニカル/アノマリー/ダイバージェンスの3軸のみで機械的にスコアリング（Finnhub/Claude不使用、
   無料・高速・4時間キャッシュ）。各銘柄に短期/中期/長期のおすすめ投資期間と根拠文をヒューリス
   ティックで付与し、そのままウォッチリストに追加できるボタンを設置
+- [x] フェーズ15: 銘柄詳細ページの総合判定に「保有期間別の売り時の目安」を追加
+  （`exit-criteria.ts`、`ExitCriteriaCard`）。総合判定自体は複数の時間軸を混ぜた指標なので
+  単一の期間を前提にしないと明記した上で、短期/中期/長期それぞれについてRSI・MACD・
+  SMA20/50/200・デッドクロス・ファンダメンタルズ悪化など、現在の実数値に基づいた具体的な
+  売却トリガー文を生成。総合判定の根拠説明もAPIキー未設定時に空メッセージではなく
+  `buildRuleBasedRationale`（各軸のテキストを整形した無料の要約、軸間の矛盾があれば注記）を
+  返すよう変更——Claude版と違い新しい解釈や自然な統合はしないが、数値の捏造リスクもない
 
 全フェーズの土台は完成。残っているのはユーザー側の作業（Finnhubの共有APIキー取得、各ユーザーが
 `/settings`から自分のAnthropic APIキーを登録、Vercelへの実デプロイ）と、

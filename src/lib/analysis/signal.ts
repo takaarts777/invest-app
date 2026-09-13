@@ -160,9 +160,9 @@ type RationaleInput = {
   compositeLabel: string;
 };
 
-function buildPrompt(item: WatchlistItem, data: RationaleInput): string {
+function axisTexts(data: RationaleInput) {
   const technicalText = data.technical
-    ? data.technical.signals.join("、")
+    ? data.technical.signals.join("、") || "特筆すべき偏りは見られませんでした。"
     : "データ不足のため分析できませんでした。";
 
   const fundamentalText = data.fundamental.available
@@ -174,7 +174,7 @@ function buildPrompt(item: WatchlistItem, data: RationaleInput): string {
     : `分析できませんでした（${data.sentiment.reason}）`;
 
   const smartMoneyText = data.smartMoney.available
-    ? data.smartMoney.signals.join("、")
+    ? data.smartMoney.signals.join("、") || "特筆すべき偏りは見られませんでした。"
     : `データなし（${data.smartMoney.reason}）`;
 
   const anomalyText = data.anomaly
@@ -185,6 +185,13 @@ function buildPrompt(item: WatchlistItem, data: RationaleInput): string {
   const divergenceText = data.divergence
     ? (data.divergence.events[0]?.description ?? "直近60営業日以内にRSI/価格のダイバージェンスは検出されませんでした。")
     : "データ不足のため分析できませんでした。";
+
+  return { technicalText, fundamentalText, sentimentText, smartMoneyText, anomalyText, divergenceText };
+}
+
+function buildPrompt(item: WatchlistItem, data: RationaleInput): string {
+  const { technicalText, fundamentalText, sentimentText, smartMoneyText, anomalyText, divergenceText } =
+    axisTexts(data);
 
   return `あなたは投資分析アシスタントです。以下は「${item.symbol}」${
     item.displayName ? `（${item.displayName}）` : ""
@@ -206,13 +213,73 @@ function buildPrompt(item: WatchlistItem, data: RationaleInput): string {
 【RSI/価格ダイバージェンス】${divergenceText}`;
 }
 
+/** When a composite-score-opposing axis is strong enough to be worth
+ *  calling out explicitly, even in the free rule-based summary. */
+function disagreementNote(data: RationaleInput): string | null {
+  const compositeSign = Math.sign(data.compositeScore);
+  if (compositeSign === 0) return null;
+
+  const conflicts: string[] = [];
+  const checkConflict = (score: number, name: string) => {
+    if (Math.sign(score) !== 0 && Math.sign(score) !== compositeSign && Math.abs(score) > 0.3) {
+      conflicts.push(name);
+    }
+  };
+
+  if (data.technical) checkConflict(data.technical.score, "テクニカル分析");
+  if (data.fundamental.available) checkConflict(data.fundamental.score, "ファンダメンタル分析");
+  // Contrarian-flipped, matching how it's folded into the composite.
+  if (data.sentiment.available) checkConflict(-data.sentiment.score, "ニュースセンチメント（逆張り換算後）");
+  if (data.smartMoney.available) checkConflict(data.smartMoney.score, "Smart Money");
+
+  if (conflicts.length === 0) return null;
+  return `一方で、${conflicts.join("・")}は総合判定と逆方向のシグナルを示しており、判断が分かれている点に注意してください。`;
+}
+
+/** Free, no-API-key fallback: the same per-axis facts Claude would be
+ *  given, compiled into a readable summary by simple rules instead of
+ *  an LLM call. Grounded and accurate by construction (it's literally
+ *  reciting the already-computed numbers), but — unlike Claude's
+ *  version — it can't weigh conflicting signals contextually, notice
+ *  nuance a template can't anticipate, or vary its phrasing; it's a
+ *  compilation of facts already visible in the panels below, not a new
+ *  synthesis of them. */
+function buildRuleBasedRationale(data: RationaleInput): string {
+  const {
+    technicalText,
+    fundamentalText,
+    sentimentText,
+    smartMoneyText,
+    anomalyText,
+    divergenceText,
+  } = axisTexts(data);
+  const note = disagreementNote(data);
+
+  const lines = [
+    `総合判定は「${data.compositeLabel}」（スコア${data.compositeScore.toFixed(
+      2
+    )}、-1=強い売り〜+1=強い買い）です。`,
+    `テクニカル分析: ${technicalText}`,
+    `ファンダメンタル分析: ${fundamentalText}`,
+    `ニュースセンチメント（逆張り指標）: ${sentimentText}`,
+    `Smart Money（インサイダー取引）: ${smartMoneyText}`,
+    `アノマリー分析: ${anomalyText}`,
+    `RSI/価格ダイバージェンス: ${divergenceText}`,
+  ];
+  if (note) lines.push(note);
+  lines.push(
+    "（この根拠説明はAnthropic APIキー未設定のため、AIではなくルールベースで自動生成した要約です。各分析パネルの数値をそのまま整理したもので、軸をまたいだニュアンスの解釈は行っていません。設定ページでご自身のAPIキーを登録すると、より自然な文章の根拠説明に切り替わります。）"
+  );
+  return lines.join("\n");
+}
+
 async function generateRationale(
   item: WatchlistItem,
   data: RationaleInput,
   apiKey: string | null
 ): Promise<string> {
   if (!apiKey) {
-    return "（Anthropic APIキーが未設定のため、AIによる根拠説明は生成されていません。設定ページからご自身のAPIキーを登録すると利用できます。各分析パネルの数値を参考にしてください。）";
+    return buildRuleBasedRationale(data);
   }
 
   try {
