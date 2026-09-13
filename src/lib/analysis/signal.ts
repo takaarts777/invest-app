@@ -43,7 +43,7 @@ const WEIGHTS = {
   divergence: 0.2,
 };
 
-function labelFor(score: number): string {
+export function labelFor(score: number): string {
   if (score > 0.4) return "強い買い";
   if (score > 0.15) return "買い";
   if (score < -0.4) return "強い売り";

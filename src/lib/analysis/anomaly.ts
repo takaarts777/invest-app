@@ -48,7 +48,7 @@ function stddev(values: number[]): number {
  * there isn't enough history.
  */
 export function analyzeAnomaly(
-  item: WatchlistItem,
+  item: Pick<WatchlistItem, "assetType" | "symbol">,
   bars: DailyBar[]
 ): AnomalyMetrics | null {
   if (bars.length < 30) return null;

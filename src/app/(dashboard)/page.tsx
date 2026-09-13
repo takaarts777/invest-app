@@ -4,10 +4,12 @@ import { getSessionUserId } from "@/lib/session";
 import { getLatestSnapshotsFor } from "@/lib/snapshots";
 import { getMarketOverview } from "@/lib/market-overview";
 import { getUpcomingMacroEventsWithNews } from "@/lib/macro-news";
+import { getTopRecommendations } from "@/lib/recommendations";
 import { AddTickerForm } from "@/components/AddTickerForm";
 import { WatchlistCard } from "@/components/WatchlistCard";
 import { MacroCalendar } from "@/components/MacroCalendar";
 import { MarketOverview } from "@/components/MarketOverview";
+import { RecommendationsSection } from "@/components/RecommendationsSection";
 import { SectorHeatmap } from "@/components/SectorHeatmap";
 import { getSectorHeatmap } from "@/lib/sector-heatmap";
 import { RatePredictor } from "@/components/RatePredictor";
@@ -27,6 +29,7 @@ export default async function DashboardPage() {
   const marketOverview = await getMarketOverview();
   const sectorHeatmap = await getSectorHeatmap();
   const macroEvents = await getUpcomingMacroEventsWithNews(6);
+  const recommendations = await getTopRecommendations(10);
 
   return (
     <div className="space-y-6">
@@ -46,6 +49,11 @@ export default async function DashboardPage() {
       <RatePredictor />
 
       <MacroCalendar events={macroEvents} />
+
+      <RecommendationsSection
+        recommendations={recommendations}
+        existingSymbols={items.map((i) => i.symbol)}
+      />
 
       <AddTickerForm />
 

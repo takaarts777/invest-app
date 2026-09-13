@@ -108,6 +108,11 @@ src/
     snapshots.ts                # AnalysisSnapshotの取得ヘルパー
     market-overview.ts           # ダッシュボードの市場全体参考指標（Fear&Greed等）
     macro-news.ts                  # 経済指標カレンダーの各イベントに紐づく日本語ニュースリンク（Google News RSS、タイプ毎キャッシュ）
+    recommendations.ts               # 市場全体（BREADTH_UNIVERSE約110銘柄）からのおすすめ銘柄トップN抽出。
+                                      # テクニカル/アノマリー/ダイバージェンスの3軸のみ（Finnhub/Claude不使用）で
+                                      # スコアリングし、投資期間（短期/中期/長期）をヒューリスティックで推定。4時間キャッシュ
+    recommendations-constants.ts       # InvestmentHorizon型・HORIZON_LABEL。recommendations.tsから分離し、
+                                        # クライアントコンポーネントがserver-onlyな依存を巻き込まず参照できるようにしている
     sector-heatmap.ts              # セクターETF11本の値動きヒートマップ
     rate-predictor.ts                # 2年債利回り vs 短期金利
     zbt.ts                             # ZBT指標の計算
@@ -169,6 +174,11 @@ prisma/
   履歴（最大5件）を返すようにし、`AnalysisPanels`に専用の「ダイバージェンス分析」カードを追加。
   総合判定の重みも技術/ファンダ/センチメント/アノマリー/Smart Money/ダイバージェンスの6軸に
   再配分（`AnalysisSnapshot.divergenceScore`追加）
+- [x] フェーズ14: フロントページに「注目銘柄トップ10」を追加（`RecommendationsSection.tsx`、
+  `lib/recommendations.ts`）。ウォッチリストに限らずBREADTH_UNIVERSE（約110銘柄）全体から、
+  テクニカル/アノマリー/ダイバージェンスの3軸のみで機械的にスコアリング（Finnhub/Claude不使用、
+  無料・高速・4時間キャッシュ）。各銘柄に短期/中期/長期のおすすめ投資期間と根拠文をヒューリス
+  ティックで付与し、そのままウォッチリストに追加できるボタンを設置
 
 全フェーズの土台は完成。残っているのはユーザー側の作業（Finnhubの共有APIキー取得、各ユーザーが
 `/settings`から自分のAnthropic APIキーを登録、Vercelへの実デプロイ）と、
