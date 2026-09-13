@@ -10,6 +10,7 @@ import type { SmartMoneyMetrics } from "@/lib/analysis/smartmoney";
 import type { AnomalyMetrics } from "@/lib/analysis/anomaly";
 import type { DivergenceMetrics } from "@/lib/analysis/divergence";
 import { buildExitCriteria } from "@/lib/analysis/exit-criteria";
+import { INDICATOR_COLOR } from "@/lib/analysis/indicator-colors";
 import { SpeedometerGauge } from "@/components/SpeedometerGauge";
 
 type RawDetails = {
@@ -656,7 +657,7 @@ function ExitCriteriaCard({
   return (
     <Panel title="保有期間別の売り時の目安">
       <p className="mb-3 text-xs text-slate-500">
-        「買い進めたものの、その後の材料次第ですぐ下落して損をする」を避けるための目安です。どの期間で保有するかを決めたら、対応する条件を売り時の判断材料にしてください（投資助言ではなく、機械的なルールベースの目安です）。
+        「買い進めたものの、その後の材料次第ですぐ下落して損をする」を避けるための目安です。どの期間で保有するかを決めたら、対応する条件を売り時の判断材料にしてください（投資助言ではなく、機械的なルールベースの目安です）。色付きの点は、上の価格チャート・下のRSIチャートに描画されている同じ色の線に対応しています。
       </p>
       <div className="space-y-3">
         {criteria.map((c) => (
@@ -665,9 +666,19 @@ function ExitCriteriaCard({
               {c.label}
               <span className="ml-1.5 text-xs font-normal text-slate-500">（{c.period}）</span>
             </p>
-            <ul className="mt-1 space-y-1 text-xs text-slate-400">
+            <ul className="mt-1 space-y-1.5 text-xs text-slate-400">
               {c.triggers.map((t, i) => (
-                <li key={i}>・{t}</li>
+                <li key={i} className="flex items-start gap-1.5">
+                  {t.indicator ? (
+                    <span
+                      className={`mt-1 h-2 w-2 shrink-0 rounded-full ${INDICATOR_COLOR[t.indicator].dotClassName}`}
+                      aria-hidden
+                    />
+                  ) : (
+                    <span className="mt-1 h-2 w-2 shrink-0" aria-hidden />
+                  )}
+                  <span>{t.text}</span>
+                </li>
               ))}
             </ul>
           </div>

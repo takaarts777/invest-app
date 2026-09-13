@@ -84,7 +84,7 @@ src/
     api/
       watchlist/         # 銘柄の一覧取得・追加・削除（全てuserIdでスコープ）
       watchlist/[id]/     # 削除、PATCH（保有数量・平均取得単価の設定/解除）
-      prices/[id]/        # 価格ヒストリー + 現在値 + RSI(14)系列
+      prices/[id]/        # 価格ヒストリー + 現在値 + RSI(14)系列 + SMA20/50/200系列
       analyze/[id]/        # 6軸分析パイプラインを実行しAnalysisSnapshotを保存
       search-ticker/        # 銘柄名/ティッカーのオートコンプリート検索
       users/                # ユーザー一覧取得・追加
@@ -133,7 +133,12 @@ src/
                                                 # 全走査し、直近シグナルだけでなく検出履歴も返す）
       exit-criteria.ts                           # 保有期間別（短期/中期/長期）の「こうなったら売る」を
                                                 # 現在の指標値から生成する純粋関数。"server-only"ではなく、
-                                                # AnalysisPanels.tsx（クライアント）が直接呼び出す
+                                                # AnalysisPanels.tsx（クライアント）が直接呼び出す。各トリガーに
+                                                # indicator-colors.tsのIndicatorKindを付与し、PriceChart/RsiChart
+                                                # 上の同色の線と対応させる
+      indicator-colors.ts                        # exit-criteria.tsのトリガーとPriceChart/RsiChartのSMA・
+                                                # ダイバージェンス線を同じ色で結びつけるための共有カラーマップ
+                                                # （チャート用hexとカードの点用Tailwindクラスの両方を保持）
       signal.ts                                # 6軸を重み付け合成 + Claudeで根拠説明文を生成
                                                 # （APIキー未設定時はbuildRuleBasedRationaleで無料の
                                                 # ルールベース要約にフォールバック、空メッセージにはしない）
@@ -194,6 +199,11 @@ prisma/
   売却トリガー文を生成。総合判定の根拠説明もAPIキー未設定時に空メッセージではなく
   `buildRuleBasedRationale`（各軸のテキストを整形した無料の要約、軸間の矛盾があれば注記）を
   返すよう変更——Claude版と違い新しい解釈や自然な統合はしないが、数値の捏造リスクもない
+- [x] フェーズ16: 「保有期間別の売り時の目安」を実際のチャートと視覚的に接続。PriceChartに
+  SMA20/50/200を重ね描き（色は`indicator-colors.ts`で統一、凡例付き）、売却トリガーの文言に
+  「チャート上の黄色の線」のように対応する色を明記。ダイバージェンス発生時はPriceChart・
+  RsiChartの両方に検出した2点を結ぶ点線とマーカーを描画（`createSeriesMarkers`、v5 API）。
+  新しいチャートセクションを増やすのではなく、既存のチャートに情報を統合する方針で対応
 
 全フェーズの土台は完成。残っているのはユーザー側の作業（Finnhubの共有APIキー取得、各ユーザーが
 `/settings`から自分のAnthropic APIキーを登録、Vercelへの実デプロイ）と、

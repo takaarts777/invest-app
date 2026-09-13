@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getWatchlistItem } from "@/lib/market";
 import { getSessionUserId } from "@/lib/session";
 import { getLatestSnapshot } from "@/lib/snapshots";
+import type { DivergenceMetrics } from "@/lib/analysis/divergence";
 import { PriceChart } from "@/components/PriceChart";
 import { RsiChart } from "@/components/RsiChart";
 import { AnalysisPanels } from "@/components/AnalysisPanels";
@@ -23,6 +24,22 @@ export default async function TickerPage(props: PageProps<"/ticker/[id]">) {
   if (!item) notFound();
   const snapshot = await getLatestSnapshot(item.id);
 
+  // Pulled out server-side so PriceChart/RsiChart can draw the same
+  // divergence connector line the "保有期間別の売り時の目安" card
+  // refers to, without either chart needing to know about
+  // AnalysisSnapshot/rawDetails itself. Missing/old-shape rawDetails
+  // (e.g. a snapshot saved before this axis existed) just yields null —
+  // both charts already treat that as "nothing to draw".
+  let divergence: DivergenceMetrics | null = null;
+  if (snapshot?.rawDetails) {
+    try {
+      const parsed = JSON.parse(snapshot.rawDetails) as { divergence?: DivergenceMetrics };
+      divergence = parsed.divergence ?? null;
+    } catch {
+      divergence = null;
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -42,9 +59,9 @@ export default async function TickerPage(props: PageProps<"/ticker/[id]">) {
         )}
       </div>
 
-      <PriceChart watchlistItemId={item.id} />
+      <PriceChart watchlistItemId={item.id} divergence={divergence} />
 
-      <RsiChart watchlistItemId={item.id} />
+      <RsiChart watchlistItemId={item.id} divergence={divergence} />
 
       <AnalysisPanels watchlistItemId={item.id} initialSnapshot={snapshot} />
 

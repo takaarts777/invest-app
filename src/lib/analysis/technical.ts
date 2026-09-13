@@ -38,6 +38,24 @@ export function calculateRsiSeries(bars: DailyBar[], period = 14): RsiPoint[] {
   return values.map((value, i) => ({ date: bars[period + i].date, value }));
 }
 
+export type SmaPoint = { date: string; value: number };
+
+/**
+ * Full SMA(period) time series aligned back onto bar dates, so the
+ * price chart can overlay it directly (as opposed to analyzeTechnical's
+ * single latest-value read used for scoring/the exit-criteria text).
+ * SMA.calculate()'s first output is the average of the first `period`
+ * closes, so sma[i] lines up with bars[period - 1 + i].
+ */
+export function calculateSmaSeries(bars: DailyBar[], period: number): SmaPoint[] {
+  if (bars.length < period) return [];
+
+  const closes = bars.map((b) => b.close);
+  const values = SMA.calculate({ period, values: closes });
+
+  return values.map((value, i) => ({ date: bars[period - 1 + i].date, value }));
+}
+
 /**
  * Rule-based technical read: trend (price vs SMA50/200, golden/death
  * cross), momentum (RSI, MACD histogram), and mean-reversion (Bollinger

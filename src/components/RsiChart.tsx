@@ -4,11 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import {
   createChart,
   LineSeries,
+  createSeriesMarkers,
   type IChartApi,
   type ISeriesApi,
+  type ISeriesMarkersPluginApi,
+  type Time,
 } from "lightweight-charts";
+import { INDICATOR_COLOR } from "@/lib/analysis/indicator-colors";
 
 type RsiPoint = { date: string; value: number };
+
+// Just the shape this component actually reads — see PriceChart.tsx.
+type DivergenceForChart = {
+  signal: "bullish" | "bearish" | "none";
+  events: { fromDate: string; toDate: string; fromRsi: number; toRsi: number }[];
+} | null;
 
 const OVERBOUGHT = 75;
 const OVERSOLD = 30;
@@ -26,10 +36,21 @@ function readState(value: number): { label: string; className: string } {
   return { label: "中立", className: "bg-slate-800 text-slate-400" };
 }
 
-export function RsiChart({ watchlistItemId }: { watchlistItemId: string }) {
+export function RsiChart({
+  watchlistItemId,
+  divergence = null,
+}: {
+  watchlistItemId: string;
+  /** Same divergence read passed to PriceChart — draws the mirror-image
+   *  connector here (RSI values instead of price) so the two charts
+   *  visibly agree on which two points formed the divergence. */
+  divergence?: DivergenceForChart;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const divergenceLineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -115,13 +136,67 @@ export function RsiChart({ watchlistItemId }: { watchlistItemId: string }) {
 
     chartRef.current = chart;
     seriesRef.current = series;
+    markersRef.current = createSeriesMarkers(series, []);
 
     return () => {
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      divergenceLineRef.current = null;
+      markersRef.current = null;
     };
   }, []);
+
+  // Draw the divergence connector + markers whenever the snapshot's
+  // divergence read changes — see PriceChart.tsx for the same pattern.
+  useEffect(() => {
+    if (!chartRef.current || !seriesRef.current) return;
+
+    divergenceLineRef.current?.applyOptions({ visible: false });
+    markersRef.current?.setMarkers([]);
+
+    const event = divergence?.signal !== "none" ? divergence?.events[0] : undefined;
+    if (!event) return;
+
+    const color =
+      divergence?.signal === "bullish"
+        ? INDICATOR_COLOR.divergenceBullish.hex
+        : INDICATOR_COLOR.divergenceBearish.hex;
+
+    if (!divergenceLineRef.current) {
+      divergenceLineRef.current = chartRef.current.addSeries(LineSeries, {
+        lineWidth: 2,
+        lineStyle: 2, // dashed
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+      });
+    }
+    divergenceLineRef.current.applyOptions({ color, visible: true });
+    divergenceLineRef.current.setData([
+      { time: event.fromDate as Time, value: event.fromRsi },
+      { time: event.toDate as Time, value: event.toRsi },
+    ]);
+
+    markersRef.current?.setMarkers([
+      {
+        time: event.fromDate as Time,
+        position: "atPriceMiddle",
+        price: event.fromRsi,
+        shape: "circle",
+        color,
+        id: "divergence-from",
+      },
+      {
+        time: event.toDate as Time,
+        position: "atPriceMiddle",
+        price: event.toRsi,
+        shape: "circle",
+        color,
+        id: "divergence-to",
+      },
+    ]);
+  }, [divergence]);
 
   const state = latest !== null ? readState(latest) : null;
 
