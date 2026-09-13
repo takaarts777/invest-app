@@ -2,6 +2,7 @@ import "server-only";
 
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { prisma } from "@/lib/db";
 
 // Multi-user app: the session identifies which User is logged in, so
 // every data query can be scoped to them.
@@ -76,8 +77,25 @@ export async function isAuthenticated() {
 
 /** The logged-in user's id, or null if there's no valid session. Every
  *  data-access function in lib/market.ts, lib/portfolio.ts, etc. takes
- *  this as a scoping parameter — never trust a client-supplied userId. */
+ *  this as a scoping parameter — never trust a client-supplied userId.
+ *
+ *  Also confirms the id still exists in the DB. A cookie can be a
+ *  cryptographically valid, unexpired JWT for a user that no longer
+ *  exists — e.g. after a full DB reset (the SQLite→Postgres migration
+ *  did this) or an admin deleting that account — since proxy.ts only
+ *  checks the signature/shape, not DB state. Without this check, that
+ *  stale-but-valid session sails past every page's `if (!userId)
+ *  redirect("/login")` guard and only fails later as a raw Prisma
+ *  foreign-key error (e.g. creating a WatchlistItem for a userId with
+ *  no matching User row). Treating it as logged-out here instead routes
+ *  it through the normal login flow. */
 export async function getSessionUserId(): Promise<string | null> {
   const session = await getSession();
-  return session?.userId ?? null;
+  if (!session?.userId) return null;
+
+  const exists = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { id: true },
+  });
+  return exists ? session.userId : null;
 }
