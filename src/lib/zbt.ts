@@ -3,22 +3,31 @@ import "server-only";
 import * as yahoo from "@/lib/providers/yahoo";
 import { BREADTH_UNIVERSE } from "@/lib/data/breadth-universe";
 import { getSp500Cycle } from "@/lib/sp500-cycle";
-import { decideZbtSignal, DRAWDOWN_TRIGGER_PCT, ZBT_LEVEL, RSI_LEVEL, GATE_MIN_UPSIDE_PCT, type ZbtSignalState } from "@/lib/analysis/zbt-signal";
+import {
+  decideZbtSignal,
+  DRAWDOWN_TRIGGER_PCT,
+  ZBT_DIP_LEVEL,
+  ZBT_POP_LEVEL,
+  POP_WINDOW_DAYS,
+  RSI_LEVEL,
+  GATE_MIN_UPSIDE_PCT,
+  type ZbtSignalState,
+} from "@/lib/analysis/zbt-signal";
 
-export { DRAWDOWN_TRIGGER_PCT, ZBT_LEVEL, RSI_LEVEL, GATE_MIN_UPSIDE_PCT };
+export { DRAWDOWN_TRIGGER_PCT, ZBT_DIP_LEVEL, ZBT_POP_LEVEL, POP_WINDOW_DAYS, RSI_LEVEL, GATE_MIN_UPSIDE_PCT };
 
 // Zweig Breadth Thrust: a 10-day EMA of (advancing issues / total issues)
 // across the market. See breadth-universe.ts for the caveat on the stock
 // sample used here vs. the real NYSE/S&P 500 feed.
 //
 // Buy signal (as specified by the user):
-//   1. The S&P 500 has fallen >= DRAWDOWN_TRIGGER_PCT from the high of its
+//   1. The S&P 500 is down >= DRAWDOWN_TRIGGER_PCT from the high of its
 //      current cycle (see lib/analysis/market-cycle.ts), AND
-//   2. The ZBT EMA has come down to <= ZBT_LEVEL, AND
-//   3. The cycle gate is open: the historical-median top is still more
-//      than GATE_MIN_UPSIDE_PCT above the current price. If not, the
-//      conditions are met but the signal is "suppressed" — shown, not fired.
-// This replaces the earlier "dip below 0.40, then pop above 0.615" rule.
+//   2. The ZBT EMA has been <= ZBT_DIP_LEVEL, and within POP_WINDOW_DAYS
+//      trading days it rose to >= ZBT_POP_LEVEL, AND
+//   3. S&P 500 RSI(14) <= RSI_LEVEL, AND
+//   4. The cycle gate is open (upside to the historical-median top > 8%).
+//      Conditions 1-3 met with the gate closed is "suppressed".
 
 export type ZbtPoint = { date: string; ratio: number; ema: number };
 
@@ -30,7 +39,10 @@ export type ZbtResult = {
   latestEma: number | null;
   signal: ZbtSignal;
   /** Most recent date the EMA closed at or below ZBT_LEVEL. */
+  /** Date of the most recent ZBT dip to <= ZBT_DIP_LEVEL. */
   dipDate: string | null;
+  /** Date the pop to >= ZBT_POP_LEVEL happened, if it completed the pattern. */
+  popDate: string | null;
   universeSize: number;
   sampledSize: number;
   /** The S&P 500 side of the signal, so the UI can show why it fired
@@ -61,6 +73,7 @@ const EMPTY: ZbtResult = {
   latestEma: null,
   signal: "none",
   dipDate: null,
+  popDate: null,
   universeSize: BREADTH_UNIVERSE.length,
   sampledSize: 0,
   sp500: null,
@@ -126,7 +139,6 @@ export async function getZbtIndicator(): Promise<ZbtResult> {
 
   const recent = series.slice(-OUTPUT_LOOKBACK_DAYS);
   const latestEma = recent.length ? recent[recent.length - 1].ema : null;
-  const dipDate = [...recent].reverse().find((p) => p.ema <= ZBT_LEVEL)?.date ?? null;
 
   // S&P 500 side. A failure here shouldn't take the whole ZBT panel down —
   // it just means no S&P context, so the signal can't fire.
@@ -135,9 +147,9 @@ export async function getZbtIndicator(): Promise<ZbtResult> {
   const drawdownPct = current ? current.drawdownFromHighPct : null;
   const upsideToTopPct = current ? current.upsideToTopPct : null;
   const rsi14 = cycle ? cycle.rsi14 : null;
-  const { signal, drawdownReached, rsiReached, gateOpen } = decideZbtSignal({
+  const { signal, drawdownReached, rsiReached, gateOpen, dipIndex, popIndex } = decideZbtSignal({
     drawdownPct,
-    latestEma,
+    emaSeries: recent.map((p) => p.ema),
     rsi14,
     upsideToTopPct,
   });
@@ -146,7 +158,8 @@ export async function getZbtIndicator(): Promise<ZbtResult> {
     series: recent,
     latestEma,
     signal,
-    dipDate,
+    dipDate: dipIndex !== null ? recent[dipIndex].date : null,
+    popDate: popIndex !== null ? recent[popIndex].date : null,
     universeSize: BREADTH_UNIVERSE.length,
     sampledSize: perSymbolCloses.length,
     sp500: cycle

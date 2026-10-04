@@ -11,6 +11,7 @@ type ZbtData = {
   latestEma: number | null;
   signal: ZbtSignal;
   dipDate: string | null;
+  popDate: string | null;
   universeSize: number;
   sampledSize: number;
   sp500: {
@@ -25,16 +26,18 @@ type ZbtData = {
   } | null;
 };
 
-// Mirrors DRAWDOWN_TRIGGER_PCT / ZBT_LEVEL / GATE_MIN_UPSIDE_PCT in
+// Mirrors the thresholds in lib/analysis/zbt-signal.ts for display only.
 // lib/zbt.ts — kept here as literals for display only.
-const DRAWDOWN_TRIGGER_PCT = 18.9;
-const ZBT_LEVEL = 0.4;
+const DRAWDOWN_TRIGGER_PCT = 18;
+const ZBT_DIP_LEVEL = 0.41;
+const ZBT_POP_LEVEL = 0.6;
+const POP_WINDOW_DAYS = 10;
 const RSI_LEVEL = 30;
 const GATE_MIN_UPSIDE_PCT = 8;
 
 const SIGNAL_BANNER: Record<ZbtSignal, { text: string; className: string } | null> = {
   fired: {
-    text: "🚀 ZBT買いシグナル点灯！ S&P500の高値から18.9%以上の下落 ＋ ZBT 0.40以下 ＋ RSI30以下 ＋ 上昇余地8%超",
+    text: "🚀 ZBT買いシグナル点灯！ S&P500の高値から18%以上の下落 ＋ ZBT 0.41以下から10営業日以内に0.6超え ＋ RSI30以下 ＋ 上昇余地8%超",
     className: "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/50",
   },
   suppressed: {
@@ -42,7 +45,7 @@ const SIGNAL_BANNER: Record<ZbtSignal, { text: string; className: string } | nul
     className: "bg-slate-700/50 text-slate-300",
   },
   waiting: {
-    text: "S&P500は18.9%以上下落済み。ZBT 0.40以下・RSI30以下の成立を待機中",
+    text: "S&P500は18%以上下落済み。ZBTの0.41以下→0.6超えと、RSI30以下の成立を待機中",
     className: "bg-amber-500/15 text-amber-300",
   },
   none: null,
@@ -79,11 +82,11 @@ export function ZbtIndicator() {
             json.series.map((p: ZbtPoint) => ({ time: p.date, value: p.ema }))
           );
           emaSeries.createPriceLine({
-            price: ZBT_LEVEL,
+            price: ZBT_DIP_LEVEL,
             color: "#ef4444",
             lineWidth: 1,
             lineStyle: 2,
-            title: "0.40",
+            title: "0.41",
           });
           chartRef.current.timeScale().fitContent();
         }
@@ -130,7 +133,7 @@ export function ZbtIndicator() {
         ZBT指標（Zweig Breadth Thrust・S&amp;P500近似）
       </h2>
       <p className="mt-1 text-xs text-slate-500">
-        買いシグナルは「S&amp;P500が現在のサイクルの高値から{DRAWDOWN_TRIGGER_PCT}%以上下落」し、かつ「値上がり銘柄比率の10日EMAが{ZBT_LEVEL}以下」かつ「S&P500のRSI(14)が{RSI_LEVEL}以下」の時に発動します。さらにS&P500のRSI(14)が30以下であること、かつサイクル上の上昇余地（予測天井までの距離）が{GATE_MIN_UPSIDE_PCT}%を超えている場合に限ります。S&amp;P500の主要{data?.universeSize ?? 110}銘柄のサンプルによる近似値です。
+        買いシグナルは「S&amp;P500が現在のサイクルの高値から{DRAWDOWN_TRIGGER_PCT}%以上下落」し、かつ「値上がり銘柄比率の10日EMAが{ZBT_DIP_LEVEL}以下まで下がった後、{POP_WINDOW_DAYS}営業日以内に{ZBT_POP_LEVEL}以上へ上昇」し、かつ「S&amp;P500のRSI(14)が{RSI_LEVEL}以下」の時に発動します。さらに、サイクル上の上昇余地（予測天井までの距離）が{GATE_MIN_UPSIDE_PCT}%を超えている場合に限ります。S&amp;P500の主要{data?.universeSize ?? 110}銘柄のサンプルによる近似値です。
       </p>
 
       {error && (
@@ -158,8 +161,8 @@ export function ZbtIndicator() {
               </p>
             </div>
             <div className="rounded-lg bg-slate-950/40 px-3 py-2">
-              <p className="text-xs text-slate-500">ZBT 10日EMA（条件 {ZBT_LEVEL}以下）</p>
-              <p className={data.latestEma !== null && data.latestEma <= ZBT_LEVEL ? "font-semibold text-emerald-300" : "font-semibold text-slate-100"}>
+              <p className="text-xs text-slate-500">ZBT 10日EMA（{ZBT_DIP_LEVEL}以下 → {ZBT_POP_LEVEL}超え）</p>
+              <p className={data.popDate ? "font-semibold text-emerald-300" : "font-semibold text-slate-100"}>
                 {data.latestEma !== null ? data.latestEma.toFixed(3) : "-"}
               </p>
             </div>
@@ -178,7 +181,8 @@ export function ZbtIndicator() {
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-slate-600">
-            {data.dipDate && <span>直近のZBT 0.40以下: {data.dipDate}</span>}
+            {data.dipDate && <span>直近のZBT {ZBT_DIP_LEVEL}以下: {data.dipDate}</span>}
+            {data.popDate && <span>{ZBT_POP_LEVEL}超え: {data.popDate}</span>}
             <span>サンプル {data.sampledSize}/{data.universeSize} 銘柄</span>
           </div>
         </>
