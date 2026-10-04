@@ -105,6 +105,11 @@ export function RecommendationsSection({
                 <span className="text-xs text-slate-600">{i + 1}</span>
                 <span className="font-semibold text-slate-100">{r.symbol}</span>
                 <span className="truncate text-xs text-slate-500">{r.displayName}</span>
+                {r.sector && (
+                  <span className="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
+                    {r.sector}
+                  </span>
+                )}
               </div>
               <AddButton
                 symbol={r.symbol}

@@ -5,7 +5,7 @@ import { analyzeTechnical, type TechnicalMetrics } from "@/lib/analysis/technica
 import { analyzeAnomaly, type AnomalyMetrics } from "@/lib/analysis/anomaly";
 import { analyzeDivergence, type DivergenceMetrics } from "@/lib/analysis/divergence";
 import { labelFor } from "@/lib/analysis/signal";
-import { BREADTH_UNIVERSE } from "@/lib/data/breadth-universe";
+import { BREADTH_UNIVERSE, sectorOf } from "@/lib/data/breadth-universe";
 import type { InvestmentHorizon } from "@/lib/recommendations-constants";
 
 export type { InvestmentHorizon };
@@ -13,6 +13,8 @@ export type { InvestmentHorizon };
 export type StockRecommendation = {
   symbol: string;
   displayName: string;
+  /** Japanese GICS-style sector label, from the universe grouping. */
+  sector: string | null;
   price: number;
   changePercent: number | null;
   compositeScore: number;
@@ -135,6 +137,7 @@ async function scanOne(symbol: string): Promise<StockRecommendation | null> {
     return {
       symbol,
       displayName: chart.displayName,
+      sector: sectorOf(symbol),
       price: chart.price,
       changePercent: chart.changePercent,
       compositeScore,
