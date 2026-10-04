@@ -12,20 +12,20 @@
 // real thing directionally but won't reproduce it exactly — treat the
 // signal as a rough proxy, not the official indicator.
 //
-// Grouped by sector (Japanese label) so each symbol can be shown with
+// Grouped by sector (katakana GICS names) so each symbol can be shown with
 // its sector; BREADTH_UNIVERSE below is the flat list, same order.
 export const BREADTH_SECTORS: Record<string, string[]> = {
-  情報技術: ["AAPL", "MSFT", "NVDA", "AVGO", "ORCL", "CRM", "ADBE", "CSCO", "AMD", "QCOM"],
-  通信サービス: ["GOOGL", "META", "NFLX", "DIS", "CMCSA", "T", "VZ", "TMUS", "CHTR", "EA"],
-  一般消費財: ["AMZN", "TSLA", "HD", "MCD", "NKE", "LOW", "SBUX", "BKNG", "TJX", "MAR"],
-  生活必需品: ["PG", "KO", "PEP", "WMT", "COST", "PM", "MO", "CL", "MDLZ", "TGT"],
-  金融: ["JPM", "BAC", "WFC", "GS", "MS", "C", "AXP", "BLK", "SCHW", "SPGI"],
-  ヘルスケア: ["LLY", "UNH", "JNJ", "ABBV", "MRK", "PFE", "TMO", "ABT", "DHR", "GILD"],
-  資本財: ["CAT", "HON", "UPS", "BA", "GE", "RTX", "LMT", "DE", "UNP", "MMM"],
-  エネルギー: ["XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "OXY", "WMB", "VLO"],
-  公益事業: ["NEE", "DUK", "SO", "D", "AEP", "EXC", "SRE", "XEL", "ED", "PEG"],
-  不動産: ["PLD", "AMT", "EQIX", "PSA", "O", "SPG", "WELL", "DLR", "CCI", "AVB"],
-  素材: ["LIN", "SHW", "APD", "ECL", "FCX", "NEM", "DOW", "NUE", "VMC", "MLM"],
+  "テクノロジー": ["AAPL", "MSFT", "NVDA", "AVGO", "ORCL", "CRM", "ADBE", "CSCO", "AMD", "QCOM"],
+  "コミュニケーション・サービス": ["GOOGL", "META", "NFLX", "DIS", "CMCSA", "T", "VZ", "TMUS", "CHTR", "EA"],
+  "コンシューマー・ディスクレッショナリー": ["AMZN", "TSLA", "HD", "MCD", "NKE", "LOW", "SBUX", "BKNG", "TJX", "MAR"],
+  "コンシューマー・ステープルズ": ["PG", "KO", "PEP", "WMT", "COST", "PM", "MO", "CL", "MDLZ", "TGT"],
+  "ファイナンシャル": ["JPM", "BAC", "WFC", "GS", "MS", "C", "AXP", "BLK", "SCHW", "SPGI"],
+  "ヘルスケア": ["LLY", "UNH", "JNJ", "ABBV", "MRK", "PFE", "TMO", "ABT", "DHR", "GILD"],
+  "インダストリアル": ["CAT", "HON", "UPS", "BA", "GE", "RTX", "LMT", "DE", "UNP", "MMM"],
+  "エネルギー": ["XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "OXY", "WMB", "VLO"],
+  "ユーティリティーズ": ["NEE", "DUK", "SO", "D", "AEP", "EXC", "SRE", "XEL", "ED", "PEG"],
+  "リアルエステート": ["PLD", "AMT", "EQIX", "PSA", "O", "SPG", "WELL", "DLR", "CCI", "AVB"],
+  "マテリアルズ": ["LIN", "SHW", "APD", "ECL", "FCX", "NEM", "DOW", "NUE", "VMC", "MLM"],
 };
 
 export const BREADTH_UNIVERSE: string[] = Object.values(BREADTH_SECTORS).flat();
