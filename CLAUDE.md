@@ -90,7 +90,8 @@ src/
       users/                # ユーザー一覧取得・追加
       users/[id]/            # ユーザー削除（自分自身は削除不可）
       rate-predictor/         # 2年債利回り vs 短期金利
-      zbt/                     # ZBT(Zweig Breadth Thrust)指標
+      zbt/                     # ZBT(Zweig Breadth Thrust)指標（S&P500サイクルのゲートと連動）
+      sp500-cycle/             # S&P500サイクル予測（底→高値の中央値、1950年〜の日足から算出）
       simulator/                # 口座サマリー取得（GET）
       simulator/trade/            # 疑似売買の実行（POST、買い/売り）
       simulator/reset/              # 口座を元手¥500,000にリセット（POST）
@@ -118,7 +119,10 @@ src/
                                         # クライアントコンポーネントがserver-onlyな依存を巻き込まず参照できるようにしている
     sector-heatmap.ts              # セクターETF11本の値動きヒートマップ
     rate-predictor.ts                # 2年債利回り vs 短期金利
-    zbt.ts                             # ZBT指標の計算
+    zbt.ts                             # ZBT指標の計算。買いシグナルはS&P500サイクル側の条件（高値からの下落18.9%以上・上昇余地8%超）と組み合わせて判定
+    zbt-signal.ts                       # ZBTシグナルの判定（純粋関数。4状態: fired/suppressed/waiting/none）
+    sp500-cycle.ts                      # S&P500日足の取得（1950年〜、12時間キャッシュ）
+    analysis/market-cycle.ts            # 20%以上の下落を伴う底の抽出、完結サイクルの中央値、現在地の計算（純粋関数）
     data/                                # 静的な参照データ（セクターETF、S&P500近似ユニバース等）
     providers/                            # 外部API個別クライアント（yahoo/coingecko/finnhub/
                                            # cnnfeargreed/feargreed/forex/googlenews）
@@ -204,6 +208,8 @@ prisma/
   「チャート上の黄色の線」のように対応する色を明記。ダイバージェンス発生時はPriceChart・
   RsiChartの両方に検出した2点を結ぶ点線とマーカーを描画（`createSeriesMarkers`、v5 API）。
   新しいチャートセクションを増やすのではなく、既存のチャートに情報を統合する方針で対応
+
+- [x] フェーズ17: S&P500サイクル予測セクション（Sp500CyclePanel）を追加。20%以上下落の弱気相場の底から次の高値までの幅・期間の中央値を、1950年以降の日足（完結サイクル10件、1年未満の戻り相場は除外）から算出し、現在の価格・時期の位置、予測の最高値と時期を表示。ZBT買いシグナルは「現在のサイクル高値から18.9%以上下落」かつ「ZBT 10日EMAが0.40以下」かつ「予測天井までの上昇余地が8%超」の3条件で発動（条件を満たしても上昇余地が8%以下なら「抑制」として表示）。旧「0.40割れ→0.615超え」条件は置き換え
 
 全フェーズの土台は完成。残っているのはユーザー側の作業（Finnhubの共有APIキー取得、各ユーザーが
 `/settings`から自分のAnthropic APIキーを登録、Vercelへの実デプロイ）と、

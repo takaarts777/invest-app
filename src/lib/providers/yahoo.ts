@@ -194,3 +194,49 @@ export async function searchQuotes(
     )
     .map(({ symbol, name, exchange }) => ({ symbol, name, exchange }));
 }
+
+/**
+ * Daily bars from an explicit start date (unix seconds) through today.
+ * `range=max` on this endpoint silently falls back to monthly bars, so a
+ * long-horizon daily history has to be requested with period1/period2
+ * instead. Used by the S&P 500 cycle analysis, which needs 1950 onward.
+ */
+export async function fetchDailyBarsSince(
+  symbol: string,
+  period1Unix: number
+): Promise<DailyBar[]> {
+  const period2 = Math.floor(Date.now() / 1000);
+  const url = `${BASE_URL}/${encodeURIComponent(symbol)}?period1=${period1Unix}&period2=${period2}&interval=1d`;
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`Yahoo Finance API error (${res.status}) for ${symbol}`);
+  }
+
+  const data = await res.json();
+  const result = data?.chart?.result?.[0];
+  if (!result) {
+    throw new SymbolLookupError(`銘柄「${symbol}」が見つかりませんでした。`);
+  }
+
+  const timestamps: number[] = result.timestamp ?? [];
+  const quote = result.indicators?.quote?.[0] ?? {};
+
+  return timestamps
+    .map((ts, i) => ({
+      date: new Date(ts * 1000).toISOString().slice(0, 10),
+      open: quote.open?.[i],
+      high: quote.high?.[i],
+      low: quote.low?.[i],
+      close: quote.close?.[i],
+      volume: quote.volume?.[i] ?? 0,
+    }))
+    .filter((bar) => [bar.open, bar.high, bar.low, bar.close].every(
+      (v) => typeof v === "number" && !Number.isNaN(v)
+    ));
+}
