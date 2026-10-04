@@ -3,9 +3,9 @@ import "server-only";
 import * as yahoo from "@/lib/providers/yahoo";
 import { BREADTH_UNIVERSE } from "@/lib/data/breadth-universe";
 import { getSp500Cycle } from "@/lib/sp500-cycle";
-import { decideZbtSignal, DRAWDOWN_TRIGGER_PCT, ZBT_LEVEL, GATE_MIN_UPSIDE_PCT, type ZbtSignalState } from "@/lib/analysis/zbt-signal";
+import { decideZbtSignal, DRAWDOWN_TRIGGER_PCT, ZBT_LEVEL, RSI_LEVEL, GATE_MIN_UPSIDE_PCT, type ZbtSignalState } from "@/lib/analysis/zbt-signal";
 
-export { DRAWDOWN_TRIGGER_PCT, ZBT_LEVEL, GATE_MIN_UPSIDE_PCT };
+export { DRAWDOWN_TRIGGER_PCT, ZBT_LEVEL, RSI_LEVEL, GATE_MIN_UPSIDE_PCT };
 
 // Zweig Breadth Thrust: a 10-day EMA of (advancing issues / total issues)
 // across the market. See breadth-universe.ts for the caveat on the stock
@@ -40,6 +40,9 @@ export type ZbtResult = {
     drawdownPct: number | null;
     drawdownReached: boolean;
     /** Upside from the latest close to the historical-median cycle top, in %. */
+    /** S&P 500 daily RSI(14), the momentum leg of the signal. */
+    rsi14: number | null;
+    rsiReached: boolean;
     upsideToTopPct: number | null;
     gateOpen: boolean;
     predictedTopClose: number | null;
@@ -131,7 +134,13 @@ export async function getZbtIndicator(): Promise<ZbtResult> {
   const current = cycle?.current ?? null;
   const drawdownPct = current ? current.drawdownFromHighPct : null;
   const upsideToTopPct = current ? current.upsideToTopPct : null;
-  const { signal, drawdownReached, gateOpen } = decideZbtSignal({ drawdownPct, latestEma, upsideToTopPct });
+  const rsi14 = cycle ? cycle.rsi14 : null;
+  const { signal, drawdownReached, rsiReached, gateOpen } = decideZbtSignal({
+    drawdownPct,
+    latestEma,
+    rsi14,
+    upsideToTopPct,
+  });
 
   const data: ZbtResult = {
     series: recent,
@@ -145,6 +154,8 @@ export async function getZbtIndicator(): Promise<ZbtResult> {
           drawdownPct,
           drawdownReached,
           upsideToTopPct,
+          rsi14,
+          rsiReached,
           gateOpen,
           predictedTopClose: current?.predictedTopClose ?? null,
           predictedTopDate: current?.predictedTopDate ?? null,

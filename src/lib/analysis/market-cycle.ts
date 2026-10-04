@@ -16,6 +16,8 @@
 // The sample is small (roughly ten completed cycles since 1957), so
 // every output here is a rough historical reference, not a forecast.
 
+import { RSI } from "technicalindicators";
+
 export type Bar = { date: string; close: number };
 
 export const CYCLE_THRESHOLD = 0.2;
@@ -132,6 +134,8 @@ export type CycleAnalysis = {
   latestClose: number;
   threshold: number;
   sampleSize: number;
+  /** Latest 14-day RSI of the index closes (Wilder via technicalindicators). */
+  rsi14: number | null;
   medianMagnitudePct: number | null;
   medianYears: number | null;
   cycles: CompletedCycle[];
@@ -180,9 +184,12 @@ export function analyzeMarketCycle(bars: Bar[], thr = CYCLE_THRESHOLD): CycleAna
     }
   }
 
+  const rsiArr = RSI.calculate({ period: 14, values: bars.map((b) => b.close) });
+
   return {
     asOf: latest.date,
     latestClose: latest.close,
+    rsi14: rsiArr.length ? rsiArr[rsiArr.length - 1] : null,
     threshold: thr,
     sampleSize: cycles.length,
     medianMagnitudePct: medMag === null ? null : medMag * 100,
