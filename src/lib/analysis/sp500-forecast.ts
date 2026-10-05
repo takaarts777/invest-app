@@ -162,13 +162,22 @@ export function analyzeSp500Forecast(bars: Bar[]): Sp500Forecast {
   const latest = bars[latestIdx];
   const medRise = median(events.map((e) => e.riseToPeakPct));
   const medDays = median(events.map((e) => e.daysToPeak));
-  const predicted = medRise === null ? null : latest.close * (1 + medRise / 100);
+
+  // The predicted high is anchored on the most recent confirmed signal (its
+  // two-year target), so the target date matches the signal, not today.
+  const pendingRaw = pending.length ? pending[0] : null;
+  const anchored = pendingRaw && medRise !== null ? pendingRaw.close * (1 + medRise / 100) : null;
+  const anchoredDate = pendingRaw
+    ? new Date(Date.parse(pendingRaw.date) + 2 * DAYS_PER_YEAR * 86400000).toISOString().slice(0, 10)
+    : null;
+  const predicted = anchored ?? (medRise === null ? null : latest.close * (1 + medRise / 100));
   const predictedDate =
-    medDays === null
+    anchoredDate ??
+    (medDays === null
       ? null
       : new Date(Date.parse(latest.date) + (medDays / 252) * DAYS_PER_YEAR * 86400000)
           .toISOString()
-          .slice(0, 10);
+          .slice(0, 10));
 
   return {
     asOf: latest.date,
@@ -189,10 +198,10 @@ export function analyzeSp500Forecast(bars: Bar[]): Sp500Forecast {
       pending.length === 0
         ? null
         : {
-            date: pending[0].date,
-            close: pending[0].close,
-            targetDate: new Date(Date.parse(pending[0].date) + 2 * DAYS_PER_YEAR * 86400000).toISOString().slice(0, 10),
-            targetClose: medRise === null ? null : pending[0].close * (1 + medRise / 100),
+            date: pendingRaw!.date,
+            close: pendingRaw!.close,
+            targetDate: anchoredDate!,
+            targetClose: anchored,
           },
   };
 }
