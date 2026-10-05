@@ -17,6 +17,7 @@ type Forecast = {
   rsi14: number | null;
   events: ForecastEvent[];
   excluded: { year: number; declinePct: number; reason: string }[];
+  pendingSignal: { date: string; close: number; targetDate: string; targetClose: number | null } | null;
   sampleSize: number;
   medianRisePct: number | null;
   medianDaysToPeak: number | null;
@@ -214,7 +215,12 @@ export function Sp500CyclePanel() {
                   </li>
                 ))}
               </ul>
-              {data.excluded.length > 0 && (
+              {data.pendingSignal && (
+            <p className="mt-3 text-xs text-slate-400">
+              進行中の発動: {data.pendingSignal.date}（終値 {fmtPrice(data.pendingSignal.close)}）→ {data.pendingSignal.targetDate} の予測: {data.pendingSignal.targetClose !== null ? fmtPrice(data.pendingSignal.targetClose) : "-"}（中央値を適用）
+            </p>
+          )}
+          {data.excluded.length > 0 && (
                 <p className="mt-2 text-slate-600">
                   除外: {data.excluded.map((x) => `${x.year}年（-${x.declinePct}%・${x.reason}）`).join("、")}
                 </p>

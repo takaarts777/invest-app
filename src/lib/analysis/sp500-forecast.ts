@@ -30,7 +30,7 @@ export const HISTORICAL_ZBT_SIGNALS: HistoricalSignal[] = [
   // the two 2023 entries it is hasn't been confirmed; it is assigned to the 19.61% row.
   { year: 2023, declinePct: 19.61, knownDate: "2023-03-31" },
   { year: 2023, declinePct: 14.16 },
-  { year: 2025, declinePct: 18.9 },
+  { year: 2025, declinePct: 18.9, knownDate: "2025-04-24" }, // signal date confirmed by the user; its 2-year window ends 2027-04-24
 ];
 
 export const DRAWDOWN_TRIGGER_PCT = 19.61; // median of the table, used by the live signal
@@ -71,6 +71,9 @@ export type Sp500Forecast = {
   upsidePct: number | null;
   /** Approximate calendar date of the predicted high. */
   predictedHighDate: string | null;
+  /** A confirmed signal whose two-year window hasn't finished yet: its close
+   *  and the level the median rise implies for two years later. */
+  pendingSignal: { date: string; close: number; targetDate: string; targetClose: number | null } | null;
 };
 
 function median(values: number[]): number | null {
@@ -113,6 +116,7 @@ export function analyzeSp500Forecast(bars: Bar[]): Sp500Forecast {
 
   // Match each table entry to the first trading day of its year that reaches its decline.
   const events: ForecastEvent[] = [];
+  const pending: { date: string; close: number }[] = [];
   const excluded: Sp500Forecast["excluded"] = [];
   const usedDates = new Set<string>();
   const latestIdx = bars.length - 1;
@@ -137,6 +141,7 @@ export function analyzeSp500Forecast(bars: Bar[]): Sp500Forecast {
     const end = idx + FORWARD_TRADING_DAYS;
     if (end > latestIdx) {
       excluded.push({ ...sig, reason: "発動から2年分のデータが揃っていない" });
+      pending.push({ date: bars[idx].date, close: closes[idx] });
       continue;
     }
     let maxC = -Infinity;
@@ -180,5 +185,14 @@ export function analyzeSp500Forecast(bars: Bar[]): Sp500Forecast {
     differencePoints: predicted === null ? null : predicted - latest.close,
     upsidePct: predicted === null ? null : (predicted / latest.close - 1) * 100,
     predictedHighDate: predictedDate,
+    pendingSignal:
+      pending.length === 0
+        ? null
+        : {
+            date: pending[0].date,
+            close: pending[0].close,
+            targetDate: new Date(Date.parse(pending[0].date) + 2 * DAYS_PER_YEAR * 86400000).toISOString().slice(0, 10),
+            targetClose: medRise === null ? null : pending[0].close * (1 + medRise / 100),
+          },
   };
 }
