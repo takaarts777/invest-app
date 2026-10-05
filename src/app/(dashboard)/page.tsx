@@ -16,6 +16,8 @@ import { RatePredictor } from "@/components/RatePredictor";
 import { ZbtIndicator } from "@/components/ZbtIndicator";
 import { Sp500CyclePanel } from "@/components/Sp500CyclePanel";
 import { ZbtSignalLog } from "@/components/ZbtSignalLog";
+import { ZbtBuyZoneBanner } from "@/components/ZbtBuyZoneBanner";
+import { getZbtIndicator } from "@/lib/zbt";
 import { prisma } from "@/lib/db";
 
 // The watchlist and market overview both change over time; force
@@ -33,6 +35,7 @@ export default async function DashboardPage() {
   const sectorHeatmap = await getSectorHeatmap();
   const macroEvents = await getUpcomingMacroEventsWithNews(6);
   const recommendations = await getTopRecommendations(10);
+  const zbt = await getZbtIndicator().catch(() => null);
   const zbtEvents = await prisma.zbtSignalEvent.findMany({ orderBy: { signalDate: "desc" }, take: 20 });
 
   return (
@@ -45,6 +48,8 @@ export default async function DashboardPage() {
           気になる銘柄を追加すると、多面的な分析結果と買い時・売り時の目安を確認できます。
         </p>
       </div>
+
+      {zbt?.signal === "fired" && <ZbtBuyZoneBanner zbt={zbt} />}
 
       <Sp500CyclePanel />
 
