@@ -26,7 +26,7 @@ type Forecast = {
 };
 
 // Mirrors lib/analysis/sp500-forecast.ts for display only.
-const DRAWDOWN_TRIGGER_PCT = 18;
+const DRAWDOWN_TRIGGER_PCT = 19.61;
 const RSI_LEVEL = 30;
 
 function fmtPrice(n: number): string {

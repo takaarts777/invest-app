@@ -1,6 +1,6 @@
 // Pure decision for the ZBT buy signal, kept free of I/O so each state
 // can be checked directly. See lib/zbt.ts for the data side.
-export const DRAWDOWN_TRIGGER_PCT = 18;
+export const DRAWDOWN_TRIGGER_PCT = 19.61; // median pre-signal decline, 9 historical ZBT signals
 export const ZBT_DIP_LEVEL = 0.41;
 export const ZBT_POP_LEVEL = 0.6;
 export const POP_WINDOW_DAYS = 10;

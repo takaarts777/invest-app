@@ -28,7 +28,7 @@ type ZbtData = {
 
 // Mirrors the thresholds in lib/analysis/zbt-signal.ts for display only.
 // lib/zbt.ts — kept here as literals for display only.
-const DRAWDOWN_TRIGGER_PCT = 18;
+const DRAWDOWN_TRIGGER_PCT = 19.61;
 const ZBT_DIP_LEVEL = 0.41;
 const ZBT_POP_LEVEL = 0.6;
 const POP_WINDOW_DAYS = 10;
@@ -37,7 +37,7 @@ const GATE_MIN_UPSIDE_PCT = 8;
 
 const SIGNAL_BANNER: Record<ZbtSignal, { text: string; className: string } | null> = {
   fired: {
-    text: "🚀 ZBT買いシグナル点灯！ S&P500の高値から18%以上の下落 ＋ ZBT 0.41以下から10営業日以内に0.6超え ＋ RSI30以下 ＋ 上昇余地8%超",
+    text: "🚀 ZBT買いシグナル点灯！ S&P500の高値から19.61%以上の下落 ＋ ZBT 0.41以下から10営業日以内に0.6超え ＋ RSI30以下 ＋ 上昇余地8%超",
     className: "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/50",
   },
   suppressed: {
@@ -45,7 +45,7 @@ const SIGNAL_BANNER: Record<ZbtSignal, { text: string; className: string } | nul
     className: "bg-slate-700/50 text-slate-300",
   },
   waiting: {
-    text: "S&P500は18%以上下落済み。ZBTの0.41以下→0.6超えと、RSI30以下の成立を待機中",
+    text: "S&P500は19.61%以上下落済み。ZBTの0.41以下→0.6超えと、RSI30以下の成立を待機中",
     className: "bg-amber-500/15 text-amber-300",
   },
   none: null,

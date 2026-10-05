@@ -17,7 +17,7 @@ import { RSI } from "technicalindicators";
 export type Bar = { date: string; close: number };
 
 export const BULL_START = "2009-03-09";
-export const DRAWDOWN_TRIGGER_PCT = 18;
+export const DRAWDOWN_TRIGGER_PCT = 19.61; // median pre-signal decline, 9 historical ZBT signals
 export const RSI_LEVEL = 30;
 export const FORWARD_TRADING_DAYS = 504; // two years
 export const EPISODE_GAP_DAYS = 60;

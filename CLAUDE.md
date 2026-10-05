@@ -122,7 +122,7 @@ src/
     zbt.ts                             # ZBT指標の計算。買いシグナルはS&P500サイクル側の条件（高値からの下落18.9%以上・上昇余地8%超）と組み合わせて判定
     zbt-signal.ts                       # ZBTシグナルの判定（純粋関数。4状態: fired/suppressed/waiting/none）
     sp500-cycle.ts                      # S&P500日足の取得（1950年〜、12時間キャッシュ）
-    analysis/sp500-forecast.ts          # 2009年以降の「高値から18%以上下落かつRSI30以下」の発動点を抽出し、2年以内の最高値までの上昇率の中央値から予測（純粋関数）
+    analysis/sp500-forecast.ts          # 2009年以降の「高値から19.61%以上下落（9件の過去ZBT発動前の下落の中央値）かつRSI30以下」の発動点を抽出し、2年以内の最高値までの上昇率の中央値から予測（純粋関数）
     data/                                # 静的な参照データ（セクターETF、S&P500近似ユニバース等）
     providers/                            # 外部API個別クライアント（yahoo/coingecko/finnhub/
                                            # cnnfeargreed/feargreed/forex/googlenews）
