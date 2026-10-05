@@ -15,6 +15,8 @@ import { getSectorHeatmap } from "@/lib/sector-heatmap";
 import { RatePredictor } from "@/components/RatePredictor";
 import { ZbtIndicator } from "@/components/ZbtIndicator";
 import { Sp500CyclePanel } from "@/components/Sp500CyclePanel";
+import { ZbtSignalLog } from "@/components/ZbtSignalLog";
+import { prisma } from "@/lib/db";
 
 // The watchlist and market overview both change over time; force
 // per-request rendering rather than relying on Next's static/dynamic
@@ -31,6 +33,7 @@ export default async function DashboardPage() {
   const sectorHeatmap = await getSectorHeatmap();
   const macroEvents = await getUpcomingMacroEventsWithNews(6);
   const recommendations = await getTopRecommendations(10);
+  const zbtEvents = await prisma.zbtSignalEvent.findMany({ orderBy: { signalDate: "desc" }, take: 20 });
 
   return (
     <div className="space-y-6">
@@ -46,6 +49,8 @@ export default async function DashboardPage() {
       <Sp500CyclePanel />
 
       <ZbtIndicator />
+
+      <ZbtSignalLog events={zbtEvents} />
 
       <MarketOverview data={marketOverview} />
 

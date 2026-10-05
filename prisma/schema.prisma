@@ -151,3 +151,25 @@ model AnalysisSnapshot {
 
   @@index([watchlistItemId, computedAt])
 }
+
+// One row per ZBT buy signal (keyed by the day its pattern completed), recorded
+// by the daily zbt-signal cron. Stores the prediction made at the time, then
+// the realized outcome once the two-year window closes.
+model ZbtSignalEvent {
+  id                 String    @id @default(cuid())
+  signalDate         String    @unique // YYYY-MM-DD, the ZBT pop day
+  sp500Close         Float
+  drawdownPct        Float
+  rsi14              Float
+  zbtEma             Float
+  upsidePct          Float
+  medianRisePct      Float
+  sampleSize         Int
+  predictedHighClose Float
+  predictedHighDate  String
+  status             String    @default("active") // "active" | "completed"
+  realizedMaxClose   Float?
+  realizedRisePct    Float?
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+}

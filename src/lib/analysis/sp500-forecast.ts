@@ -208,3 +208,29 @@ export function analyzeSp500Forecast(bars: Bar[]): Sp500Forecast {
           },
   };
 }
+
+/**
+ * What happened over the two years after a signal on `signalDate`: the close
+ * on that day, the highest close within the next FORWARD_TRADING_DAYS, and
+ * whether that window is complete yet.
+ */
+export function realizedAfterSignal(
+  bars: Bar[],
+  signalDate: string
+): { closeAtSignal: number; maxClose: number | null; riseToPeakPct: number | null; completed: boolean } | null {
+  const idx = bars.findIndex((b) => b.date === signalDate);
+  if (idx < 0) return null;
+  const closeAtSignal = bars[idx].close;
+  const end = idx + FORWARD_TRADING_DAYS;
+  if (end > bars.length - 1) {
+    return { closeAtSignal, maxClose: null, riseToPeakPct: null, completed: false };
+  }
+  let maxClose = -Infinity;
+  for (let j = idx + 1; j <= end; j++) if (bars[j].close > maxClose) maxClose = bars[j].close;
+  return {
+    closeAtSignal,
+    maxClose,
+    riseToPeakPct: (maxClose / closeAtSignal - 1) * 100,
+    completed: true,
+  };
+}
