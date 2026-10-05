@@ -16,7 +16,7 @@ import { RSI } from "technicalindicators";
 
 export type Bar = { date: string; close: number };
 
-export type HistoricalSignal = { year: number; declinePct: number };
+export type HistoricalSignal = { year: number; declinePct: number; knownDate?: string };
 
 // The user's table: the decline from high to pre-signal low, per ZBT signal.
 export const HISTORICAL_ZBT_SIGNALS: HistoricalSignal[] = [
@@ -26,7 +26,9 @@ export const HISTORICAL_ZBT_SIGNALS: HistoricalSignal[] = [
   { year: 1982, declinePct: 27.12 },
   { year: 1984, declinePct: 14.38 },
   { year: 2019, declinePct: 19.78 },
-  { year: 2023, declinePct: 19.61 },
+  // The user confirmed a 2023 signal on 2023-03-31 (2-year rise 49.52%). Which of
+  // the two 2023 entries it is hasn't been confirmed; it is assigned to the 19.61% row.
+  { year: 2023, declinePct: 19.61, knownDate: "2023-03-31" },
   { year: 2023, declinePct: 14.16 },
   { year: 2025, declinePct: 18.9 },
 ];
@@ -116,9 +118,15 @@ export function analyzeSp500Forecast(bars: Bar[]): Sp500Forecast {
   const latestIdx = bars.length - 1;
 
   for (const sig of HISTORICAL_ZBT_SIGNALS) {
-    const idx = bars.findIndex(
-      (b, i) => b.date.startsWith(String(sig.year)) && drawdowns[i] >= sig.declinePct
-    );
+    const idx = sig.knownDate
+      ? bars.findIndex((b) => b.date === sig.knownDate)
+      : bars.findIndex(
+          (b, i) => b.date.startsWith(String(sig.year)) && drawdowns[i] >= sig.declinePct
+        );
+    if (idx < 0 && sig.knownDate) {
+      excluded.push({ ...sig, reason: "指定日がデータ上に無い" });
+      continue;
+    }
     if (idx < 0) {
       excluded.push({ ...sig, reason: "同年に該当する下落日がデータ上に見当たらない" });
       continue;
