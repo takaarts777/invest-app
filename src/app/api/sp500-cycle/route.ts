@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAuthenticated } from "@/lib/session";
-import { getSp500Cycle } from "@/lib/sp500-cycle";
+import { getSp500Forecast } from "@/lib/sp500-cycle";
 
 export async function GET() {
   if (!(await isAuthenticated())) {
@@ -8,7 +8,7 @@ export async function GET() {
   }
 
   try {
-    const data = await getSp500Cycle();
+    const data = await getSp500Forecast();
     return NextResponse.json(data);
   } catch (error) {
     const message = error instanceof Error ? error.message : "取得に失敗しました。";

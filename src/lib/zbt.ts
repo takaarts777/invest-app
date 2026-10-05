@@ -2,7 +2,7 @@ import "server-only";
 
 import * as yahoo from "@/lib/providers/yahoo";
 import { BREADTH_UNIVERSE } from "@/lib/data/breadth-universe";
-import { getSp500Cycle } from "@/lib/sp500-cycle";
+import { getSp500Forecast } from "@/lib/sp500-cycle";
 import {
   decideZbtSignal,
   DRAWDOWN_TRIGGER_PCT,
@@ -22,7 +22,7 @@ export { DRAWDOWN_TRIGGER_PCT, ZBT_DIP_LEVEL, ZBT_POP_LEVEL, POP_WINDOW_DAYS, RS
 //
 // Buy signal (as specified by the user):
 //   1. The S&P 500 is down >= DRAWDOWN_TRIGGER_PCT from the high of its
-//      current cycle (see lib/analysis/market-cycle.ts), AND
+//      current cycle (see lib/analysis/sp500-forecast.ts), AND
 //   2. The ZBT EMA has been <= ZBT_DIP_LEVEL, and within POP_WINDOW_DAYS
 //      trading days it rose to >= ZBT_POP_LEVEL, AND
 //   3. S&P 500 RSI(14) <= RSI_LEVEL, AND
@@ -142,11 +142,10 @@ export async function getZbtIndicator(): Promise<ZbtResult> {
 
   // S&P 500 side. A failure here shouldn't take the whole ZBT panel down —
   // it just means no S&P context, so the signal can't fire.
-  const cycle = await getSp500Cycle().catch(() => null);
-  const current = cycle?.current ?? null;
-  const drawdownPct = current ? current.drawdownFromHighPct : null;
-  const upsideToTopPct = current ? current.upsideToTopPct : null;
-  const rsi14 = cycle ? cycle.rsi14 : null;
+  const sp = await getSp500Forecast().catch(() => null);
+  const drawdownPct = sp ? sp.drawdownFromHighPct : null;
+  const upsideToTopPct = sp ? sp.upsidePct : null;
+  const rsi14 = sp ? sp.rsi14 : null;
   const { signal, drawdownReached, rsiReached, gateOpen, dipIndex, popIndex } = decideZbtSignal({
     drawdownPct,
     emaSeries: recent.map((p) => p.ema),
@@ -162,7 +161,7 @@ export async function getZbtIndicator(): Promise<ZbtResult> {
     popDate: popIndex !== null ? recent[popIndex].date : null,
     universeSize: BREADTH_UNIVERSE.length,
     sampledSize: perSymbolCloses.length,
-    sp500: cycle
+    sp500: sp
       ? {
           drawdownPct,
           drawdownReached,
@@ -170,8 +169,8 @@ export async function getZbtIndicator(): Promise<ZbtResult> {
           rsi14,
           rsiReached,
           gateOpen,
-          predictedTopClose: current?.predictedTopClose ?? null,
-          predictedTopDate: current?.predictedTopDate ?? null,
+          predictedTopClose: sp?.predictedHighClose ?? null,
+          predictedTopDate: sp?.predictedHighDate ?? null,
         }
       : null,
   };

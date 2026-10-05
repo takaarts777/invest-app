@@ -2,41 +2,32 @@
 
 import { useEffect, useState } from "react";
 
-type Cycle = {
-  bottomDate: string;
-  bottomClose: number;
-  peakDate: string;
-  peakClose: number;
-  magnitude: number;
-  years: number;
+type ForecastEvent = {
+  date: string;
+  close: number;
+  riseToPeakPct: number;
+  daysToPeak: number;
 };
 
-type CycleState = {
-  bottomDate: string;
-  bottomClose: number;
-  cycleHighDate: string;
-  cycleHighClose: number;
-  drawdownFromHighPct: number;
-  predictedTopClose: number;
-  predictedTopDate: string;
-  progressPct: number;
-  upsideToTopPct: number;
-  elapsedYears: number;
-  medianYears: number;
-  bottomConfirmed: boolean;
-};
-
-type CycleData = {
+type Forecast = {
   asOf: string;
   latestClose: number;
+  drawdownFromHighPct: number;
+  cycleHighClose: number;
+  rsi14: number | null;
+  events: ForecastEvent[];
   sampleSize: number;
-  medianMagnitudePct: number | null;
-  medianYears: number | null;
-  cycles: Cycle[];
-  current: CycleState | null;
+  medianRisePct: number | null;
+  medianDaysToPeak: number | null;
+  predictedHighClose: number | null;
+  differencePoints: number | null;
+  upsidePct: number | null;
+  predictedHighDate: string | null;
 };
 
-const DRAWDOWN_TRIGGER_PCT = 18.9;
+// Mirrors lib/analysis/sp500-forecast.ts for display only.
+const DRAWDOWN_TRIGGER_PCT = 18;
+const RSI_LEVEL = 30;
 
 function fmtPrice(n: number): string {
   return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -92,7 +83,7 @@ function Gauge({
 }
 
 export function Sp500CyclePanel() {
-  const [data, setData] = useState<CycleData | null>(null);
+  const [data, setData] = useState<Forecast | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -118,14 +109,13 @@ export function Sp500CyclePanel() {
     };
   }, []);
 
-  const cur = data?.current ?? null;
-  const overTop = cur !== null && cur.progressPct >= 100;
+  const hasForecast = data && data.predictedHighClose !== null;
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-      <h2 className="text-sm font-semibold text-slate-200">S&amp;P500 サイクル予測</h2>
+      <h2 className="text-sm font-semibold text-slate-200">S&amp;P500 予測（発動から2年間）</h2>
       <p className="mt-1 text-xs text-slate-500">
-        1950年以降の弱気相場（20%以上の下落）の底から次の高値までの幅と期間の中央値を、現在のサイクルに当てはめた目安です。
+        2009年3月以降の強気相場で、S&amp;P500が高値から{DRAWDOWN_TRIGGER_PCT}%以上下落かつRSI(14)が{RSI_LEVEL}以下になった局面（発動点）を抽出し、その後2年以内の最高値までの上昇率の中央値を、現在の価格に当てはめた目安です。
       </p>
 
       {error && (
@@ -135,7 +125,7 @@ export function Sp500CyclePanel() {
       )}
       {loading && <p className="mt-2 text-sm text-slate-500">読み込み中...</p>}
 
-      {data && cur && (
+      {data && (
         <>
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div className="rounded-lg bg-slate-950/40 px-3 py-2">
@@ -143,22 +133,23 @@ export function Sp500CyclePanel() {
               <p className="font-semibold text-slate-100">{fmtPrice(data.latestClose)}</p>
             </div>
             <div className="rounded-lg bg-slate-950/40 px-3 py-2">
-              <p className="text-xs text-slate-500">予測の最高値（中央値ベース）</p>
-              <p className="font-semibold text-slate-100">{fmtPrice(cur.predictedTopClose)}</p>
+              <p className="text-xs text-slate-500">予測の最高値</p>
+              <p className="font-semibold text-slate-100">
+                {data.predictedHighClose !== null ? fmtPrice(data.predictedHighClose) : "-"}
+              </p>
+            </div>
+            <div className="rounded-lg bg-slate-950/40 px-3 py-2">
+              <p className="text-xs text-slate-500">現在値からの差分</p>
+              <p className="font-semibold text-emerald-300">
+                {data.differencePoints !== null
+                  ? `+${fmtPrice(data.differencePoints)}（+${data.upsidePct?.toFixed(1)}%）`
+                  : "-"}
+              </p>
             </div>
             <div className="rounded-lg bg-slate-950/40 px-3 py-2">
               <p className="text-xs text-slate-500">予測時期（目安）</p>
-              <p className="font-semibold text-slate-100">{fmtYm(cur.predictedTopDate)}頃</p>
-            </div>
-            <div className="rounded-lg bg-slate-950/40 px-3 py-2">
-              <p className="text-xs text-slate-500">最高値までの上昇余地</p>
-              <p
-                className={
-                  cur.upsideToTopPct > 8 ? "font-semibold text-emerald-300" : "font-semibold text-slate-100"
-                }
-              >
-                {cur.upsideToTopPct >= 0 ? "+" : ""}
-                {cur.upsideToTopPct.toFixed(1)}%
+              <p className="font-semibold text-slate-100">
+                {data.predictedHighDate ? `${fmtYm(data.predictedHighDate)}頃` : "-"}
               </p>
             </div>
           </div>
@@ -166,42 +157,12 @@ export function Sp500CyclePanel() {
           <div className="mt-5 space-y-5">
             <div>
               <p className="mb-1.5 text-xs text-slate-400">
-                値幅の位置：底（{fmtYm(cur.bottomDate)} {fmtPrice(cur.bottomClose)}）→ 予測の最高値
-                <span className="ml-2 text-slate-300">
-                  進捗 {Math.round(cur.progressPct)}%
-                  {overTop && "（中央値の上昇幅をすでに超過）"}
-                </span>
+                現在の高値（{fmtPrice(data.cycleHighClose)}）からの下落：
+                <span className="ml-2 text-slate-300">{data.drawdownFromHighPct.toFixed(1)}%</span>
+                <span className="ml-2 text-slate-500">（発動条件 {DRAWDOWN_TRIGGER_PCT}%以上）</span>
               </p>
               <Gauge
-                pct={cur.progressPct}
-                markerPct={overTop ? undefined : cur.progressPct}
-                leftLabel={`底 ${fmtPrice(cur.bottomClose)}`}
-                rightLabel={`予測天井 ${fmtPrice(cur.predictedTopClose)}`}
-                colorClass={overTop ? "bg-amber-400" : "bg-sky-400"}
-              />
-            </div>
-
-            <div>
-              <p className="mb-1.5 text-xs text-slate-400">
-                時間の位置：経過 {cur.elapsedYears.toFixed(1)}年 / 中央値 {cur.medianYears.toFixed(1)}年
-                <span className="ml-2 text-slate-300">{Math.round((cur.elapsedYears / cur.medianYears) * 100)}%</span>
-              </p>
-              <Gauge
-                pct={(cur.elapsedYears / cur.medianYears) * 100}
-                leftLabel={fmtYm(cur.bottomDate)}
-                rightLabel={fmtYm(cur.predictedTopDate)}
-                colorClass="bg-violet-400"
-              />
-            </div>
-
-            <div>
-              <p className="mb-1.5 text-xs text-slate-400">
-                今回のサイクルの高値（{fmtPrice(cur.cycleHighClose)}）からの下落：
-                <span className="ml-2 text-slate-300">{cur.drawdownFromHighPct.toFixed(1)}%</span>
-                <span className="ml-2 text-slate-500">（ZBT買い条件は {DRAWDOWN_TRIGGER_PCT}%以上）</span>
-              </p>
-              <Gauge
-                pct={(cur.drawdownFromHighPct / 30) * 100}
+                pct={(data.drawdownFromHighPct / 30) * 100}
                 markerPct={(DRAWDOWN_TRIGGER_PCT / 30) * 100}
                 markerLabel={`${DRAWDOWN_TRIGGER_PCT}%`}
                 leftLabel="高値 0%"
@@ -209,28 +170,51 @@ export function Sp500CyclePanel() {
                 colorClass="bg-red-400"
               />
             </div>
+            <div>
+              <p className="mb-1.5 text-xs text-slate-400">
+                S&amp;P500 RSI(14)：
+                <span className="ml-2 text-slate-300">{data.rsi14 !== null ? data.rsi14.toFixed(1) : "-"}</span>
+                <span className="ml-2 text-slate-500">（発動条件 {RSI_LEVEL}以下）</span>
+              </p>
+              <Gauge
+                pct={data.rsi14 ?? 0}
+                markerPct={RSI_LEVEL}
+                markerLabel={`${RSI_LEVEL}`}
+                leftLabel="0"
+                rightLabel="100"
+                colorClass="bg-violet-400"
+              />
+            </div>
           </div>
 
-          <p className="mt-4 text-xs text-slate-500">
-            {data.sampleSize}回の完結サイクル（中央値: 底から高値まで{" "}
-            {data.medianMagnitudePct?.toFixed(1)}%・約{data.medianYears?.toFixed(1)}年）に基づく目安です。サンプルが少なく、過去の周期が今回も繰り返される保証はありません。売買判断の材料の一つとしてご利用ください。
-          </p>
+          {hasForecast && (
+            <p className="mt-4 text-xs text-slate-500">
+              {data.sampleSize}回の発動点（中央値: 2年以内の最高値まで+{data.medianRisePct?.toFixed(1)}%・約{data.medianDaysToPeak !== null ? Math.round(data.medianDaysToPeak / 252 * 10) / 10 : "-"}年）に基づく目安です。サンプルが非常に少なく、過去の値動きが今回も繰り返される保証はありません。売買判断の材料の一つとしてご利用ください。
+            </p>
+          )}
+          {!hasForecast && (
+            <p className="mt-4 text-xs text-slate-500">
+              2009年以降に、発動条件を満たし2年間のデータが揃った局面がないため、予測を算出できません。
+            </p>
+          )}
 
-          <details className="mt-3 text-xs text-slate-500">
-            <summary className="cursor-pointer hover:text-slate-300">過去のサイクル一覧（{data.cycles.length}件）</summary>
-            <ul className="mt-2 space-y-1">
-              {data.cycles.map((c) => (
-                <li key={c.bottomDate} className="flex flex-wrap justify-between gap-2">
-                  <span>
-                    {fmtYm(c.bottomDate)} {fmtPrice(c.bottomClose)} → {fmtYm(c.peakDate)} {fmtPrice(c.peakClose)}
-                  </span>
-                  <span className="text-slate-300">
-                    +{(c.magnitude * 100).toFixed(0)}% / {c.years.toFixed(1)}年
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </details>
+          {data.events.length > 0 && (
+            <details className="mt-3 text-xs text-slate-500">
+              <summary className="cursor-pointer hover:text-slate-300">発動点の一覧（{data.events.length}件）</summary>
+              <ul className="mt-2 space-y-1">
+                {data.events.map((e) => (
+                  <li key={e.date} className="flex flex-wrap justify-between gap-2">
+                    <span>
+                      {e.date} 終値 {fmtPrice(e.close)}
+                    </span>
+                    <span className="text-slate-300">
+                      2年以内の最高値まで +{e.riseToPeakPct.toFixed(1)}%（{e.daysToPeak}営業日後）
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </>
       )}
     </div>

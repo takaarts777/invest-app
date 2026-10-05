@@ -91,7 +91,7 @@ src/
       users/[id]/            # ユーザー削除（自分自身は削除不可）
       rate-predictor/         # 2年債利回り vs 短期金利
       zbt/                     # ZBT(Zweig Breadth Thrust)指標（S&P500サイクルのゲートと連動）
-      sp500-cycle/             # S&P500サイクル予測（底→高値の中央値、1950年〜の日足から算出）
+      sp500-cycle/             # S&P500予測（発動点の2年以内上昇率の中央値、1950年〜の日足から算出）
       simulator/                # 口座サマリー取得（GET）
       simulator/trade/            # 疑似売買の実行（POST、買い/売り）
       simulator/reset/              # 口座を元手¥500,000にリセット（POST）
@@ -122,7 +122,7 @@ src/
     zbt.ts                             # ZBT指標の計算。買いシグナルはS&P500サイクル側の条件（高値からの下落18.9%以上・上昇余地8%超）と組み合わせて判定
     zbt-signal.ts                       # ZBTシグナルの判定（純粋関数。4状態: fired/suppressed/waiting/none）
     sp500-cycle.ts                      # S&P500日足の取得（1950年〜、12時間キャッシュ）
-    analysis/market-cycle.ts            # 20%以上の下落を伴う底の抽出、完結サイクルの中央値、現在地の計算（純粋関数）
+    analysis/sp500-forecast.ts          # 2009年以降の「高値から18%以上下落かつRSI30以下」の発動点を抽出し、2年以内の最高値までの上昇率の中央値から予測（純粋関数）
     data/                                # 静的な参照データ（セクターETF、S&P500近似ユニバース等）
     providers/                            # 外部API個別クライアント（yahoo/coingecko/finnhub/
                                            # cnnfeargreed/feargreed/forex/googlenews）
