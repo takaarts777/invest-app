@@ -16,6 +16,7 @@ type Forecast = {
   cycleHighClose: number;
   rsi14: number | null;
   events: ForecastEvent[];
+  excluded: { year: number; declinePct: number; reason: string }[];
   sampleSize: number;
   medianRisePct: number | null;
   medianDaysToPeak: number | null;
@@ -115,7 +116,7 @@ export function Sp500CyclePanel() {
     <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
       <h2 className="text-sm font-semibold text-slate-200">S&amp;P500 予測（発動から2年間）</h2>
       <p className="mt-1 text-xs text-slate-500">
-        2009年3月以降の強気相場で、S&amp;P500が高値から{DRAWDOWN_TRIGGER_PCT}%以上下落かつRSI(14)が{RSI_LEVEL}以下になった局面（発動点）を抽出し、その後2年以内の最高値までの上昇率の中央値を、現在の価格に当てはめた目安です。
+        過去9回のZBT発動（それぞれ高値から発動前の安値までの下落幅つき）を、S&P500の値動きに当てはめて発動日を推定し、発動後2年以内の最高値までの上昇率の中央値を、現在の価格に当てはめた目安です。
       </p>
 
       {error && (
@@ -189,12 +190,12 @@ export function Sp500CyclePanel() {
 
           {hasForecast && (
             <p className="mt-4 text-xs text-slate-500">
-              {data.sampleSize}回の発動点（中央値: 2年以内の最高値まで+{data.medianRisePct?.toFixed(1)}%・約{data.medianDaysToPeak !== null ? Math.round(data.medianDaysToPeak / 252 * 10) / 10 : "-"}年）に基づく目安です。サンプルが非常に少なく、過去の値動きが今回も繰り返される保証はありません。売買判断の材料の一つとしてご利用ください。
+              {data.sampleSize}件（中央値: 2年以内の最高値まで+{data.medianRisePct?.toFixed(1)}%・約{data.medianDaysToPeak !== null ? Math.round(data.medianDaysToPeak / 252 * 10) / 10 : "-"}年）に基づく目安です。発動日は表の年と下落幅からの推定で、サンプルも少ないため、過去の値動きが今回も繰り返される保証はありません。売買判断の材料の一つとしてご利用ください。
             </p>
           )}
           {!hasForecast && (
             <p className="mt-4 text-xs text-slate-500">
-              2009年以降に、発動条件を満たし2年間のデータが揃った局面がないため、予測を算出できません。
+              発動日を推定できた件数が無いため、予測を算出できません。
             </p>
           )}
 
@@ -213,6 +214,11 @@ export function Sp500CyclePanel() {
                   </li>
                 ))}
               </ul>
+              {data.excluded.length > 0 && (
+                <p className="mt-2 text-slate-600">
+                  除外: {data.excluded.map((x) => `${x.year}年（-${x.declinePct}%・${x.reason}）`).join("、")}
+                </p>
+              )}
             </details>
           )}
         </>

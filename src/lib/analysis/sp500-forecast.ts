@@ -1,26 +1,38 @@
-// Forecast of the S&P 500's rise over the two years after a buy-signal
-// setup, using S&P 500 history since the 2009 bottom (the current bull).
+// Forecast of the S&P 500's rise over the two years after a ZBT signal,
+// based on the nine historical ZBT signals listed by the user, each with
+// the decline from its cycle high to the low before the signal.
 //
-// Setup (index-only, because a historical breadth series for ZBT isn't
-// available): the index is down >= DRAWDOWN_TRIGGER_PCT from its running
-// cycle high AND its daily RSI(14) <= RSI_LEVEL. Each episode of that
-// condition is one historical event, taken at its first day. Episodes
-// closer than EPISODE_GAP_DAYS trading days merge into one. For each event,
-// the rise to the highest close within the next two years (504 trading
-// days) is recorded. Events without a full two-year window are dropped.
+// The table gives only years, not dates. Each entry is placed on the first
+// trading day of its year whose drawdown from the running cycle high reaches
+// the listed decline. RSI is not part of the historical match. Two entries
+// share a date (2023) and count once. Entries with no matching day, or whose
+// two-year window isn't complete, are left out. For each remaining event,
+// the rise to the highest close within the next 504 trading days is recorded.
 //
-// The running cycle high uses a causal 20% zigzag: the high is reset at
-// each confirmed trough, and within a decline it's the last peak. So the
-// same definition is used for the historical events and the current drawdown.
+// The running cycle high uses a causal 20% zigzag: it resets at each
+// confirmed trough, and within a decline it's the last peak. The same
+// definition is used for the historical matches and the current drawdown.
 import { RSI } from "technicalindicators";
 
 export type Bar = { date: string; close: number };
 
-export const BULL_START = "2009-03-09";
-export const DRAWDOWN_TRIGGER_PCT = 19.61; // median pre-signal decline, 9 historical ZBT signals
-export const RSI_LEVEL = 30;
+export type HistoricalSignal = { year: number; declinePct: number };
+
+// The user's table: the decline from high to pre-signal low, per ZBT signal.
+export const HISTORICAL_ZBT_SIGNALS: HistoricalSignal[] = [
+  { year: 1950, declinePct: 14.02 },
+  { year: 1962, declinePct: 27.97 },
+  { year: 1962, declinePct: 26.36 },
+  { year: 1982, declinePct: 27.12 },
+  { year: 1984, declinePct: 14.38 },
+  { year: 2019, declinePct: 19.78 },
+  { year: 2023, declinePct: 19.61 },
+  { year: 2023, declinePct: 14.16 },
+  { year: 2025, declinePct: 18.9 },
+];
+
+export const DRAWDOWN_TRIGGER_PCT = 19.61; // median of the table, used by the live signal
 export const FORWARD_TRADING_DAYS = 504; // two years
-export const EPISODE_GAP_DAYS = 60;
 const TURN_THRESHOLD = 0.2;
 const DAYS_PER_YEAR = 365.25;
 
@@ -31,6 +43,9 @@ export type ForecastEvent = {
   riseToPeakPct: number;
   /** Trading days from the event to that highest close. */
   daysToPeak: number;
+  /** Years listed in the source table for this event. */
+  listedYear: number;
+  listedDeclinePct: number;
 };
 
 export type Sp500Forecast = {
@@ -42,6 +57,8 @@ export type Sp500Forecast = {
   cycleHighClose: number;
   rsi14: number | null;
   events: ForecastEvent[];
+  /** Table entries with no matching day, or no complete two-year window. */
+  excluded: { year: number; declinePct: number; reason: string }[];
   sampleSize: number;
   medianRisePct: number | null;
   medianDaysToPeak: number | null;
@@ -64,7 +81,6 @@ function median(values: number[]): number | null {
 export function analyzeSp500Forecast(bars: Bar[]): Sp500Forecast {
   const closes = bars.map((b) => b.close);
   const rsi = RSI.calculate({ period: 14, values: closes });
-  const rsiOffset = closes.length - rsi.length; // rsi[i - rsiOffset] belongs to bar i
 
   // Causal running cycle high (see header).
   const drawdowns: number[] = [];
@@ -93,40 +109,44 @@ export function analyzeSp500Forecast(bars: Bar[]): Sp500Forecast {
     drawdowns.push((1 - c / refHigh) * 100);
   }
 
-  // Setup condition per day, and episodes of consecutive/near-consecutive setups.
-  const flags = bars.map((_, i) => {
-    const r = i - rsiOffset >= 0 ? rsi[i - rsiOffset] : null;
-    return drawdowns[i] >= DRAWDOWN_TRIGGER_PCT && r !== null && r <= RSI_LEVEL;
-  });
-
-  const bullIdx = Math.max(1, bars.findIndex((b) => b.date >= BULL_START));
-  const episodeStarts: number[] = [];
-  let lastTrue = -Infinity;
-  for (let i = bullIdx; i < bars.length; i++) {
-    if (!flags[i]) continue;
-    if (i - lastTrue > EPISODE_GAP_DAYS) episodeStarts.push(i);
-    lastTrue = i;
-  }
-
+  // Match each table entry to the first trading day of its year that reaches its decline.
   const events: ForecastEvent[] = [];
-  for (const i of episodeStarts) {
-    const end = i + FORWARD_TRADING_DAYS;
-    if (end > bars.length - 1) continue; // needs the full two years
+  const excluded: Sp500Forecast["excluded"] = [];
+  const usedDates = new Set<string>();
+  const latestIdx = bars.length - 1;
+
+  for (const sig of HISTORICAL_ZBT_SIGNALS) {
+    const idx = bars.findIndex(
+      (b, i) => b.date.startsWith(String(sig.year)) && drawdowns[i] >= sig.declinePct
+    );
+    if (idx < 0) {
+      excluded.push({ ...sig, reason: "同年に該当する下落日がデータ上に見当たらない" });
+      continue;
+    }
+    if (usedDates.has(bars[idx].date)) continue; // e.g. the two 2023 entries share a day
+    usedDates.add(bars[idx].date);
+
+    const end = idx + FORWARD_TRADING_DAYS;
+    if (end > latestIdx) {
+      excluded.push({ ...sig, reason: "発動から2年分のデータが揃っていない" });
+      continue;
+    }
     let maxC = -Infinity;
-    let maxIdx = i;
-    for (let j = i + 1; j <= end; j++) {
+    let maxIdx = idx;
+    for (let j = idx + 1; j <= end; j++) {
       if (closes[j] > maxC) { maxC = closes[j]; maxIdx = j; }
     }
     events.push({
-      date: bars[i].date,
-      close: closes[i],
-      riseToPeakPct: (maxC / closes[i] - 1) * 100,
-      daysToPeak: maxIdx - i,
+      date: bars[idx].date,
+      close: closes[idx],
+      riseToPeakPct: (maxC / closes[idx] - 1) * 100,
+      daysToPeak: maxIdx - idx,
+      listedYear: sig.year,
+      listedDeclinePct: sig.declinePct,
     });
   }
 
-  const latest = bars[bars.length - 1];
-  const latestIdx = bars.length - 1;
+  const latest = bars[latestIdx];
   const medRise = median(events.map((e) => e.riseToPeakPct));
   const medDays = median(events.map((e) => e.daysToPeak));
   const predicted = medRise === null ? null : latest.close * (1 + medRise / 100);
@@ -144,6 +164,7 @@ export function analyzeSp500Forecast(bars: Bar[]): Sp500Forecast {
     cycleHighClose: cycleHighs[latestIdx],
     rsi14: rsi.length ? rsi[rsi.length - 1] : null,
     events,
+    excluded,
     sampleSize: events.length,
     medianRisePct: medRise,
     medianDaysToPeak: medDays,
