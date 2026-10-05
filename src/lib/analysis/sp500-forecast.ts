@@ -23,9 +23,12 @@ export const HISTORICAL_ZBT_SIGNALS: HistoricalSignal[] = [
   { year: 1950, declinePct: 14.02 },
   { year: 1962, declinePct: 27.97 },
   { year: 1962, declinePct: 26.36 },
-  { year: 1982, declinePct: 27.12 },
+  // Public sources list an August 1982 signal (no day given). Anchored on the
+  // S&P 500 low of 12 Aug 1982, the month's bottom. Approximate.
+  { year: 1982, declinePct: 27.12, knownDate: "1982-08-12" },
   { year: 1984, declinePct: 14.38 },
-  { year: 2019, declinePct: 19.78 },
+  // Public sources list a signal on 7 January 2019.
+  { year: 2019, declinePct: 19.78, knownDate: "2019-01-07" },
   // The user confirmed a 2023 signal on 2023-03-31 (2-year rise 49.52%). Which of
   // the two 2023 entries it is hasn't been confirmed; it is assigned to the 19.61% row.
   { year: 2023, declinePct: 19.61, knownDate: "2023-03-31" },
